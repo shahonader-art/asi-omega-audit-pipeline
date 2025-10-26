@@ -39,3 +39,5 @@ For inquiries, please open an issue at
 ## Contact / Partnerships
 For inquiries, please open an issue at  
 👉 https://github.com/shahonader-art/asi-omega-audit-pipeline/issues
+
+![Verify](https://github.com/shahonader-art/asi-omega-audit-pipeline/actions/workflows/verify.yml/badge.svg)
