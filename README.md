@@ -41,3 +41,4 @@ For inquiries, please open an issue at
 👉 https://github.com/shahonader-art/asi-omega-audit-pipeline/issues
 
 ![Verify](https://github.com/shahonader-art/asi-omega-audit-pipeline/actions/workflows/verify.yml/badge.svg)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.TBA.svg)](https://doi.org/10.5281/zenodo.TBA)
