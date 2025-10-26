@@ -1,0 +1,4 @@
+DISCLAIMER (Legal)
+This software provides cryptographic verification only (hashing, Merkle proof, reproducible manifests).
+No legal advice or warranty is provided. Use at your own risk. Suitability for legal proceedings must
+be evaluated by qualified counsel in your jurisdiction.

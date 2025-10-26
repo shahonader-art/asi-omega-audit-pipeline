@@ -1,0 +1,6 @@
+ASI-Omega Integrity System — Commercial License (Summary)
+- Commercial redistribution, white-label use, or integration into paid products
+  requires a separate written agreement with the author (Shaho Nader).
+- The open-source MIT license applies for non-commercial usage only unless otherwise agreed.
+- No warranties. Use at your own risk.
+(Full terms available on request.)
