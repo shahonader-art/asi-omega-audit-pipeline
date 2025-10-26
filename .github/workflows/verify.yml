@@ -1,0 +1,45 @@
+name: Verify (DoD + Merkle + Manifest)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PowerShell 7 (ensure)
+        uses: PowerShell/PowerShell@v1
+        with:
+          version: "7.4.0"
+
+      - name: Run demo -> manifest
+        shell: pwsh
+        run: pwsh -NoProfile -File .\src\run_demo.ps1 -Out .\output
+
+      - name: Compute Merkle root
+        shell: pwsh
+        run: pwsh -NoProfile -File .\tools\Merkle.ps1 -CsvPath .\output\manifest.csv
+
+      - name: Build DoD report
+        shell: pwsh
+        run: pwsh -NoProfile -File .\tools\DoD.ps1 -Out .\output\DoD
+
+      - name: Verify full chain (DoD + Merkle + Manifest)
+        shell: pwsh
+        run: pwsh -NoProfile -File .\tools\verify.ps1 -DoD .\output\DoD\DoD.json -Manifest .\output\manifest.csv -MerkleRoot .\output\merkle_root.txt
+
+      - name: Upload artifacts (manifest, merkle, DoD)
+        uses: actions/upload-artifact@v4
+        with:
+          name: asi-omega-verify-artifacts
+          path: |
+            output/manifest.csv
+            output/merkle_root.txt
+            output/DoD/DoD.json
