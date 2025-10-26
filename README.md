@@ -29,3 +29,8 @@ pwsh -NoProfile -File .\tools\DoD.ps1 -Out .\output\DoD
 - OTS request stub (offline)
 - Optional GPG signature of DoD
 - CI uploads audit artifacts per commit
+![CI](https://github.com/shahonader-art/asi-omega-audit-pipeline/actions/workflows/ci.yml/badge.svg)
+
+## Contact / Partnerships
+For inquiries, please open an issue at  
+👉 https://github.com/shahonader-art/asi-omega-audit-pipeline/issues
