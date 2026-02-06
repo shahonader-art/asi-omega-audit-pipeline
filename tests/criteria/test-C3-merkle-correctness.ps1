@@ -7,25 +7,15 @@ $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "C3-$([guid]::NewGuid().To
 New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 $fail = $false
 
+# Load shared crypto library
+. (Join-Path $repoRoot 'lib\crypto.ps1')
+
 function Pass($id,$m){ Write-Host "PASS [$id]: $m" -ForegroundColor Green }
 function Fail($id,$m){ Write-Host "FAIL [$id]: $m" -ForegroundColor Red; $script:fail=$true }
 
-# RFC 6962 compliant helper functions (must match Merkle.ps1)
-function Hash-Leaf([string]$data){
-    $dataBytes = [System.Text.Encoding]::UTF8.GetBytes($data)
-    $prefixed = [byte[]]::new(1 + $dataBytes.Length)
-    $prefixed[0] = 0x00
-    [Array]::Copy($dataBytes, 0, $prefixed, 1, $dataBytes.Length)
-    return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($prefixed)) -Algorithm SHA256).Hash.ToLower()
-}
-
-function Hash-Internal([string]$a,[string]$b){
-    $pairBytes = [System.Text.Encoding]::UTF8.GetBytes($a + $b)
-    $prefixed = [byte[]]::new(1 + $pairBytes.Length)
-    $prefixed[0] = 0x01
-    [Array]::Copy($pairBytes, 0, $prefixed, 1, $pairBytes.Length)
-    return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($prefixed)) -Algorithm SHA256).Hash.ToLower()
-}
+# Aliases for test readability (delegate to shared library)
+function Hash-Leaf([string]$data){ return Get-MerkleLeafHash $data }
+function Hash-Internal([string]$a,[string]$b){ return Get-MerkleInternalHash $a $b }
 
 function Write-TestCsv([string]$path, [string[]]$hashes){
     $lines = @('"Rel","SHA256"')

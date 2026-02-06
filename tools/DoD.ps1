@@ -1,6 +1,10 @@
 param([string]$Out = "output\DoD")
 
 $ErrorActionPreference = 'Stop'
+
+# Load shared crypto library
+. (Join-Path $PSScriptRoot '..\lib\crypto.ps1')
+
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 
 $now = (Get-Date).ToString("o")
@@ -43,7 +47,7 @@ $pipelineScripts = @(
 foreach($s in $pipelineScripts){
     $scriptPath = Join-Path $repoRoot $s
     if(Test-Path $scriptPath){
-        $h = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath).Hash.ToLower()
+        $h = Get-Sha256FileHash $scriptPath
         $relPath = $s.Replace('\','/')
         $data.script_hashes[$relPath] = $h
     }
@@ -91,7 +95,7 @@ $data | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 -Path (Join-Path $O
 $top = Get-ChildItem -Path $repoRoot -File
 $lines = @()
 foreach($f in $top){
-  $h = (Get-FileHash -Algorithm SHA256 -LiteralPath $f.FullName).Hash
+  $h = (Get-Sha256FileHash $f.FullName).ToUpper()
   $lines += "$($f.Name),$($f.Length),$h"
 }
 $lines | Set-Content -Encoding UTF8 -Path (Join-Path $Out 'TopLevelHashes.csv')

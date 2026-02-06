@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/shahonader-art/asi-omega-audit-pipeline/docs/schemas/dod-v2.schema.json",
+  "title": "DoD (Declaration of Done) v2",
+  "description": "Schema for the ASI-Omega Audit Pipeline Declaration of Done artifact. Captures pipeline metadata, Merkle root, script integrity hashes, and NTP drift.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "name",
+    "generated",
+    "timezone",
+    "culture",
+    "platform",
+    "merkle_root",
+    "merkle_algorithm",
+    "artefacts",
+    "script_hashes"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 2,
+      "description": "Schema version. Must be 2 for this format."
+    },
+    "name": {
+      "type": "string",
+      "description": "Pipeline identifier.",
+      "examples": ["asi-omega-audit-pipeline"]
+    },
+    "generated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the DoD was generated."
+    },
+    "timezone": {
+      "type": "string",
+      "description": "IANA timezone ID of the generating machine.",
+      "examples": ["Europe/Oslo", "America/New_York"]
+    },
+    "culture": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+      "description": "Locale/culture code (e.g. nb-NO, en-US).",
+      "examples": ["nb-NO", "en-US"]
+    },
+    "platform": {
+      "type": "string",
+      "description": "Runtime platform description.",
+      "examples": ["PowerShell 7+"]
+    },
+    "merkle_root": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 Merkle root of the manifest, computed with RFC 6962 domain separation. Null if manifest was not available."
+    },
+    "merkle_algorithm": {
+      "type": "string",
+      "description": "Description of the Merkle tree algorithm used.",
+      "examples": ["SHA-256 with RFC 6962 domain separation"]
+    },
+    "ntp_drift_seconds": {
+      "type": ["number", "null"],
+      "description": "NTP clock drift in seconds. 9999 means measurement failed. Null if unavailable."
+    },
+    "artefacts": {
+      "type": "object",
+      "description": "Boolean flags indicating which artifacts were present at generation time.",
+      "required": ["manifest_csv", "golden_hashes"],
+      "properties": {
+        "manifest_csv": {
+          "type": "boolean",
+          "description": "Whether manifest.csv existed when DoD was generated."
+        },
+        "golden_hashes": {
+          "type": "boolean",
+          "description": "Whether docs/golden-hashes.json existed when DoD was generated."
+        }
+      },
+      "additionalProperties": false
+    },
+    "script_hashes": {
+      "type": "object",
+      "description": "SHA-256 hashes of pipeline scripts for integrity verification. Keys are relative paths (forward-slash), values are lowercase 64-char hex digests.",
+      "patternProperties": {
+        "^[a-zA-Z0-9_/.-]+\\.ps1$": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

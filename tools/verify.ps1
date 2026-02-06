@@ -5,6 +5,10 @@ param(
 )
 
 $ErrorActionPreference='Stop'
+
+# Load shared crypto library
+. (Join-Path $PSScriptRoot '..\lib\crypto.ps1')
+
 $warnings = @()
 function FAIL($m){ Write-Host "FAIL: $m" -ForegroundColor Red; exit 2 }
 function OK($m){ Write-Host "OK: $m" -ForegroundColor Green }
@@ -34,36 +38,7 @@ if(-not $rows -or $rows.Count -eq 0){ FAIL "manifest.csv empty" }
 $hashes = @()
 foreach($r in $rows){ $hashes += $r.SHA256.ToLower() }
 
-# RFC 6962 §2.1: leaf hash = SHA-256(0x00 || data)
-function Hash-Leaf([string]$data){
-  $dataBytes = [System.Text.Encoding]::UTF8.GetBytes($data)
-  $prefixed = [byte[]]::new(1 + $dataBytes.Length)
-  $prefixed[0] = 0x00
-  [Array]::Copy($dataBytes, 0, $prefixed, 1, $dataBytes.Length)
-  return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($prefixed)) -Algorithm SHA256).Hash.ToLower()
-}
-
-# RFC 6962 §2.1: internal hash = SHA-256(0x01 || left || right)
-function Combine([string]$a,[string]$b){
-  $pairBytes = [System.Text.Encoding]::UTF8.GetBytes($a + $b)
-  $prefixed = [byte[]]::new(1 + $pairBytes.Length)
-  $prefixed[0] = 0x01
-  [Array]::Copy($pairBytes, 0, $prefixed, 1, $pairBytes.Length)
-  return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($prefixed)) -Algorithm SHA256).Hash.ToLower()
-}
-
-# Build leaf level
-$level=[System.Collections.Generic.List[string]]::new()
-foreach($h in $hashes){ [void]$level.Add((Hash-Leaf $h)) }
-
-# Build tree
-while($level.Count -gt 1){
-  if($level.Count % 2 -ne 0){ $level.Add($level[$level.Count-1]) }
-  $next=[System.Collections.Generic.List[string]]::new()
-  for($i=0;$i -lt $level.Count;$i+=2){ $next.Add((Combine $level[$i] $level[$i+1])) }
-  $level=$next
-}
-$calcRoot=$level[0]
+$calcRoot = Build-MerkleTree $hashes
 
 if($calcRoot -ne $rootFile){ FAIL "Merkle mismatch: calc=$calcRoot file=$rootFile" } else { OK "Merkle root (recomputed, RFC 6962) matches" }
 
@@ -89,7 +64,7 @@ if($repoRoot){
             $diskFail = $true
             continue
         }
-        $diskHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $absPath).Hash.ToLower()
+        $diskHash = Get-Sha256FileHash $absPath
         $manifestHash = $r.SHA256.ToLower()
         if($diskHash -ne $manifestHash){
             Write-Host "FAIL: FILE TAMPERED: $rel (disk=$diskHash manifest=$manifestHash)" -ForegroundColor Red
@@ -180,7 +155,7 @@ if($dod.script_hashes){
             $scriptFail = $true
             continue
         }
-        $diskHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath).Hash.ToLower()
+        $diskHash = Get-Sha256FileHash $scriptPath
         $recordedHash = $prop.Value.ToLower()
         if($diskHash -ne $recordedHash){
             Write-Host "FAIL: Pipeline script TAMPERED: $($prop.Name)" -ForegroundColor Red
