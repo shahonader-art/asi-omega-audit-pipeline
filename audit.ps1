@@ -244,8 +244,8 @@ if($Timestamp -or $Full){
     $merkleRootFile = Join-Path $outDir 'merkle_root.txt'
     $otsResult = pwsh -NoProfile -File (Join-Path $root 'tools\OTS-Stamp.ps1') -Target $merkleRootFile 2>&1
     if($LASTEXITCODE -eq 0){
-        Write-Host "    Tidsstempel sendt til Bitcoin-nettverket" -ForegroundColor Green
-        $otsStatus = "Sendt til OpenTimestamps (venter paa Bitcoin-bekreftelse)"
+        Write-Host "    Uavhengig tidsstempel registrert" -ForegroundColor Green
+        $otsStatus = "Sendt til OpenTimestamps (venter paa blokkjede-bekreftelse)"
     } elseif($LASTEXITCODE -eq 3){
         Write-Host "    Kunne ikke naa OTS-servere — lokal stub lagret" -ForegroundColor Yellow
         $otsStatus = "Feilet (ingen nettverkstilgang) — lokal stub lagret"

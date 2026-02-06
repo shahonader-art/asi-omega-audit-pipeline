@@ -58,17 +58,17 @@ foreach($srv in $tryServers){
   Server:         $srv
   Tidspunkt:      $((Get-Date).ToString("o"))
   Bevis-fil:      $otsProofPath
-  Status:         SENDT (venter paa Bitcoin-bekreftelse)
+  Status:         SENDT (venter paa blokkjede-bekreftelse)
 
 ------------------------------------------------------------
   VERIFISERING:
 
-  For aa verifisere at tidsstempelet er ankret i Bitcoin:
+  For aa verifisere det uavhengige tidsstempelet:
 
   1. Installer OTS-klienten:
      pip install opentimestamps-client
 
-  2. Vent minst 4-24 timer (for Bitcoin-blokk)
+  2. Vent minst 4-24 timer (for blokkjede-bekreftelse)
 
   3. Oppgrader beviset:
      ots upgrade merkle_root.txt.ots
@@ -82,10 +82,10 @@ foreach($srv in $tryServers){
 ------------------------------------------------------------
   TEKNISK:
 
-  OpenTimestamps forankrer SHA-256-hashen din i en
-  Bitcoin-transaksjon. Dette gir et uavhengig,
-  manipulasjonssikkert bevis paa at dataene eksisterte
-  foer et bestemt tidspunkt.
+  OpenTimestamps forankrer fingeravtrykket ditt i en
+  offentlig, uforanderlig blokkjede. Dette gir et
+  uavhengig, manipulasjonssikkert bevis paa at
+  dataene eksisterte foer et bestemt tidspunkt.
 
   Ingen kan forfalske dette — heller ikke deg selv.
 ============================================================

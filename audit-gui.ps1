@@ -94,7 +94,7 @@ $chkSign.AutoSize = $true
 $form.Controls.Add($chkSign)
 
 $chkOTS = New-Object System.Windows.Forms.CheckBox
-$chkOTS.Text = "OpenTimestamps (Bitcoin-tidsstempel)"
+$chkOTS.Text = "Uavhengig tidsstempel (OpenTimestamps)"
 $chkOTS.Font = $font
 $chkOTS.ForeColor = $fgColor
 $chkOTS.Location = New-Object System.Drawing.Point(300, 155)
