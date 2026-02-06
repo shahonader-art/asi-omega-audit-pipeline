@@ -77,20 +77,35 @@ if(Test-Path $merkleRootFile){
     if(Test-Path $otsFile){
         $otsContent = Get-Content -Raw $otsFile
 
-        # The OTS stub hashes the merkle_root.txt FILE (not the content)
-        $merkleFileHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $merkleRootFile).Hash.ToLower()
-        if($otsContent -match $merkleFileHash){
-            Pass "TS3" "OTS stub contains SHA-256 of merkle_root.txt file"
+        # Check that OTS stub contains the Merkle root VALUE (content of the file)
+        $merkleContent = (Get-Content -Raw $merkleRootFile).Trim().ToLower()
+        if($otsContent -match [regex]::Escape($merkleContent)){
+            Pass "TS3a" "OTS stub contains Merkle root value"
         } else {
-            Fail "TS3" "OTS stub does not contain expected hash of merkle_root.txt"
+            Fail "TS3a" "OTS stub does not contain Merkle root value"
         }
 
-        # Check: does OTS actually submit to a timestamp service?
-        $otsSrc = Get-Content -Raw $otsScript
-        if($otsSrc -match 'Invoke-RestMethod|Invoke-WebRequest|curl|http'){
-            Pass "TS3" "OTS script contacts external timestamp service"
+        # Check that OTS stub also contains the file hash for verification
+        $merkleFileHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $merkleRootFile).Hash.ToLower()
+        if($otsContent -match $merkleFileHash){
+            Pass "TS3b" "OTS stub contains SHA-256 of merkle_root.txt file"
         } else {
-            Gap "TS3" "OTS script is a LOCAL stub only — does NOT contact any external timestamp service"
+            Fail "TS3b" "OTS stub does not contain file hash"
+        }
+
+        # Check: does OTS include instructions for external submission?
+        if($otsContent -match 'opentimestamps\.org|ots stamp'){
+            Pass "TS3c" "OTS stub includes instructions for external timestamp service"
+        } else {
+            Gap "TS3c" "OTS stub missing instructions for external attestation"
+        }
+
+        # Check: does OTS script auto-submit? (still a local stub)
+        $otsSrc = Get-Content -Raw $otsScript
+        if($otsSrc -match 'Invoke-RestMethod|Invoke-WebRequest|curl\s'){
+            Pass "TS3d" "OTS script contacts external timestamp service"
+        } else {
+            Gap "TS3d" "OTS script is a LOCAL stub — manual submission required for legal-grade timestamps"
         }
     } else {
         Fail "TS3" "OTS request file not created"

@@ -69,9 +69,8 @@ function Test-Verify($p){
 # =====================================================================
 # T1: Modifying a source file must cause verification failure
 # =====================================================================
-# NOTE: verify.ps1 only checks manifest->merkle->DoD consistency.
-# It does NOT re-hash files on disk. This test checks whether
-# modify-then-reverify detects the change.
+# verify.ps1 now checks files on disk against manifest hashes.
+# This test verifies that modifying a file is detected.
 $p1 = New-Pipeline (Join-Path $tmpDir 't1')
 $code1_before = Test-Verify $p1
 if($code1_before -ne 0){ Fail "T1" "Baseline verify failed before tampering (exit $code1_before)" }
@@ -82,10 +81,9 @@ if($code1_before -ne 0){ Fail "T1" "Baseline verify failed before tampering (exi
 # Re-run verify WITHOUT regenerating manifest — does it detect the change?
 $code1_after = Test-Verify $p1
 if($code1_after -ne 0){
-    Pass "T1" "File modification detected by verify"
+    Pass "T1" "File modification detected by verify (file-on-disk check works)"
 } else {
-    # verify.ps1 doesn't check files on disk, so this is a known gap
-    Gap "T1" "verify.ps1 PASSES despite file modification — it does NOT re-hash files on disk"
+    Fail "T1" "verify.ps1 PASSED despite file modification — disk check not working"
 }
 
 # =====================================================================
@@ -108,9 +106,9 @@ $p3 = New-Pipeline (Join-Path $tmpDir 't3')
 Remove-Item -Force (Join-Path $p3.SampleDir 'b.txt')
 $code3 = Test-Verify $p3
 if($code3 -ne 0){
-    Pass "T3" "Removed file detected by verify"
+    Pass "T3" "Removed file detected by verify (file-on-disk check works)"
 } else {
-    Gap "T3" "verify.ps1 PASSES despite deleted file — it does NOT check files on disk"
+    Fail "T3" "verify.ps1 PASSED despite deleted file — disk check not working"
 }
 
 # =====================================================================

@@ -41,13 +41,53 @@ $calcRoot=$level[0]
 
 if($calcRoot -ne $rootFile){ FAIL "Merkle mismatch: calc=$calcRoot file=$rootFile" } else { OK "Merkle root (recomputed) matches" }
 
-# 4) (valgfritt) enkel sanity på NTP-drift
-try{
-  if($dod.ntp_drift_seconds -ne $null){
-    if([math]::Abs([double]$dod.ntp_drift_seconds) -gt 5){ Write-Host "⚠ NTP drift: $($dod.ntp_drift_seconds)s" -ForegroundColor Yellow }
-    else { OK "NTP drift within 5s" }
-  }
-}catch{}
+# 4) Verify files on disk match manifest hashes
+$repoRoot = $null
+# Resolve repo root from manifest location or DoD reference
+$manifestDir = Split-Path -Parent (Resolve-Path $Manifest)
+# Walk up to find repo root (where sample/ exists)
+$candidate = $manifestDir
+while($candidate -and -not (Test-Path (Join-Path $candidate 'sample'))){
+    $candidate = Split-Path -Parent $candidate
+}
+if($candidate){ $repoRoot = $candidate }
+
+if($repoRoot){
+    $diskFail = $false
+    foreach($r in $rows){
+        $rel = ($r.Rel -replace '\\','/')
+        $absPath = Join-Path $repoRoot $rel
+        if(-not (Test-Path $absPath)){
+            Write-Host "❌ FILE MISSING on disk: $rel" -ForegroundColor Red
+            $diskFail = $true
+            continue
+        }
+        $diskHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $absPath).Hash.ToLower()
+        $manifestHash = $r.SHA256.ToLower()
+        if($diskHash -ne $manifestHash){
+            Write-Host "❌ FILE TAMPERED: $rel (disk=$diskHash manifest=$manifestHash)" -ForegroundColor Red
+            $diskFail = $true
+        } else {
+            OK "File verified: $rel"
+        }
+    }
+    if($diskFail){ FAIL "One or more files on disk do not match manifest" }
+    OK "All files on disk match manifest"
+} else {
+    Write-Host "⚠ Could not resolve repo root — skipping file-on-disk check" -ForegroundColor Yellow
+}
+
+# 5) NTP drift sanity check
+if($dod.ntp_drift_seconds -ne $null){
+    $ntpVal = [double]$dod.ntp_drift_seconds
+    if($ntpVal -eq 9999){
+        Write-Host "⚠ NTP drift is 9999 (measurement failed — see logs)" -ForegroundColor Yellow
+    } elseif([math]::Abs($ntpVal) -gt 5){
+        Write-Host "⚠ NTP drift: $($ntpVal)s (exceeds 5s threshold)" -ForegroundColor Yellow
+    } else {
+        OK "NTP drift within 5s ($($ntpVal)s)"
+    }
+}
 
 OK "VERIFY PASS"
 exit 0

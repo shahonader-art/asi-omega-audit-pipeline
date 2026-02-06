@@ -25,21 +25,35 @@ $data = @{
 }
 
 # Compute Merkle root if manifest exists
-try{
-  if(Test-Path $manifestPath){
-    pwsh -NoProfile -File (Join-Path $repoRoot 'tools\Merkle.ps1') -CsvPath $manifestPath | Out-Null
-    $mrPath = Join-Path $repoRoot 'output\merkle_root.txt'
-    if(Test-Path $mrPath){
-      $data.merkle_root = (Get-Content -Raw -Path $mrPath).Trim()
+if(Test-Path $manifestPath){
+    $merkleOut = pwsh -NoProfile -File (Join-Path $repoRoot 'tools\Merkle.ps1') -CsvPath $manifestPath 2>&1
+    if($LASTEXITCODE -ne 0){
+        Write-Host "WARNING: Merkle computation failed (exit $LASTEXITCODE): $merkleOut" -ForegroundColor Yellow
+        $data.merkle_root = $null
+    } else {
+        $mrPath = Join-Path $repoRoot 'output\merkle_root.txt'
+        if(Test-Path $mrPath){
+            $data.merkle_root = (Get-Content -Raw -Path $mrPath).Trim()
+        } else {
+            Write-Host "WARNING: Merkle script ran but merkle_root.txt not found" -ForegroundColor Yellow
+        }
     }
-  }
-}catch{}
+} else {
+    Write-Host "WARNING: manifest.csv not found at $manifestPath — skipping Merkle" -ForegroundColor Yellow
+}
 
 # NTP drift seconds (average)
-try{
-  $data.ntp_drift_seconds = (pwsh -NoProfile -File (Join-Path $repoRoot 'tools\NtpDrift.ps1'))
-}catch{
-  $data.ntp_drift_seconds = 9999
+$ntpResult = pwsh -NoProfile -File (Join-Path $repoRoot 'tools\NtpDrift.ps1') 2>&1
+$ntpVal = "$ntpResult".Trim()
+try {
+    $parsed = [double]$ntpVal
+    if($parsed -eq 9999){
+        Write-Host "WARNING: NTP measurement unavailable (returned 9999)" -ForegroundColor Yellow
+    }
+    $data.ntp_drift_seconds = $parsed
+} catch {
+    Write-Host "WARNING: NTP returned non-numeric value: '$ntpVal'" -ForegroundColor Yellow
+    $data.ntp_drift_seconds = $null
 }
 
 $data | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 -Path (Join-Path $Out 'DoD.json')
