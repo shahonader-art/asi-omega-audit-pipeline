@@ -10,10 +10,11 @@ function Pass($id,$m){ Write-Host "PASS [$id]: $m" -ForegroundColor Green }
 function Fail($id,$m){ Write-Host "FAIL [$id]: $m" -ForegroundColor Red; $script:fail=$true }
 function Gap($id,$m){ Write-Host "KNOWN-GAP [$id]: $m" -ForegroundColor Yellow; $script:gap=$true }
 
-function Run-Script([string]$script, [string[]]$args){
+function Run-Script([string]$ScriptPath, [string[]]$ScriptArgs){
     $outFile = Join-Path $tmpDir "out-$([guid]::NewGuid().ToString('N').Substring(0,8)).txt"
     $errFile = Join-Path $tmpDir "err-$([guid]::NewGuid().ToString('N').Substring(0,8)).txt"
-    $proc = Start-Process -FilePath pwsh -ArgumentList (@("-NoProfile","-File",$script) + $args) `
+    $argString = ($ScriptArgs | ForEach-Object { "`"$_`"" }) -join ' '
+    $proc = Start-Process -FilePath pwsh -ArgumentList "-NoProfile -File `"$ScriptPath`" $argString" `
             -Wait -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile -NoNewWindow
     $stdout = if(Test-Path $outFile){ Get-Content -Raw $outFile } else { "" }
     $stderr = if(Test-Path $errFile){ Get-Content -Raw $errFile } else { "" }

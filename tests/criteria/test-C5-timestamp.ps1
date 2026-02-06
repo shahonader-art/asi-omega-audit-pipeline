@@ -20,8 +20,8 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 New-Item -ItemType Directory -Force -Path $dodDir | Out-Null
 
 # We need a manifest for DoD to work
-pwsh -NoProfile -File (Join-Path $repoRoot 'src\run_demo.ps1') -Out $outDir
-pwsh -NoProfile -File (Join-Path $repoRoot 'tools\DoD.ps1') -Out $dodDir
+pwsh -NoProfile -File (Join-Path $repoRoot 'src\run_demo.ps1') -Out $outDir | Out-Null
+pwsh -NoProfile -File (Join-Path $repoRoot 'tools\DoD.ps1') -Out $dodDir | Out-Null
 
 $dodPath = Join-Path $dodDir 'DoD.json'
 if(Test-Path $dodPath){
@@ -71,7 +71,7 @@ $otsScript = Join-Path $repoRoot 'tools\OTS-Stub.ps1'
 $merkleRootFile = Join-Path $outDir 'merkle_root.txt'
 
 if(Test-Path $merkleRootFile){
-    pwsh -NoProfile -File $otsScript -Target $merkleRootFile
+    pwsh -NoProfile -File $otsScript -Target $merkleRootFile | Out-Null
     $otsFile = Join-Path $outDir 'ots_request.txt'
 
     if(Test-Path $otsFile){

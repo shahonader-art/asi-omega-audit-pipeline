@@ -9,17 +9,17 @@ $ErrorActionPreference = 'Stop'
 # Load shared crypto library
 . (Join-Path $PSScriptRoot '..\lib\crypto.ps1')
 
-if(-not $CsvPath){ Write-Error "CsvPath is required. Usage: pwsh Merkle.ps1 -CsvPath <path>"; exit 1 }
-if(-not (Test-Path $CsvPath)){ Write-Error "CSV not found: $CsvPath"; exit 2 }
+if(-not $CsvPath){ Write-Host "ERROR: CsvPath is required. Usage: pwsh Merkle.ps1 -CsvPath <path>" -ForegroundColor Red; exit 1 }
+if(-not (Test-Path $CsvPath)){ Write-Host "ERROR: CSV not found: $CsvPath" -ForegroundColor Red; exit 2 }
 
 $rows = Import-Csv -Path $CsvPath
-if(-not $rows -or $rows.Count -eq 0){ Write-Error "Empty CSV"; exit 3 }
+if(-not $rows -or $rows.Count -eq 0){ Write-Host "ERROR: Empty CSV" -ForegroundColor Red; exit 3 }
 
 $leaves = @()
 foreach($r in $rows){
   if($r.Rel -and $r.SHA256){ $leaves += $r.SHA256.ToLower() }
 }
-if($leaves.Count -eq 0){ Write-Error "No leaves extracted"; exit 4 }
+if($leaves.Count -eq 0){ Write-Host "ERROR: No valid Rel/SHA256 columns found" -ForegroundColor Red; exit 4 }
 
 $root = Build-MerkleTree $leaves
 

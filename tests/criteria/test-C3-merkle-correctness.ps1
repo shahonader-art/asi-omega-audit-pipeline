@@ -27,7 +27,7 @@ function Write-TestCsv([string]$path, [string[]]$hashes){
 
 function Get-MerkleRoot([string]$csvPath){
     $dir = Split-Path -Parent $csvPath
-    pwsh -NoProfile -File $merkleScript -CsvPath $csvPath
+    pwsh -NoProfile -File $merkleScript -CsvPath $csvPath | Out-Null
     return (Get-Content -Raw (Join-Path $dir 'merkle_root.txt')).Trim().ToLower()
 }
 

@@ -77,15 +77,21 @@ if(Test-Path $manifestPath){
 # NTP drift seconds (average)
 # ─────────────────────────────────────────────────────
 $ntpResult = pwsh -NoProfile -File (Join-Path $repoRoot 'tools\NtpDrift.ps1') 2>&1
-$ntpVal = "$ntpResult".Trim()
+# NtpDrift.ps1 may output Write-Host messages + the numeric value
+# Extract the last numeric-looking token from the output
+$ntpRaw = @($ntpResult) | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^-?\d+(\.\d+)?$' } | Select-Object -Last 1
+if(-not $ntpRaw){
+    # Fallback: try the very last line
+    $ntpRaw = "$(@($ntpResult)[-1])".Trim()
+}
 try {
-    $parsed = [double]$ntpVal
+    $parsed = [double]$ntpRaw
     if($parsed -eq 9999){
         Write-Host "WARNING: NTP measurement unavailable (returned 9999)" -ForegroundColor Yellow
     }
     $data.ntp_drift_seconds = $parsed
 } catch {
-    Write-Host "WARNING: NTP returned non-numeric value: '$ntpVal'" -ForegroundColor Yellow
+    Write-Host "WARNING: NTP returned non-numeric value: '$ntpRaw'" -ForegroundColor Yellow
     $data.ntp_drift_seconds = $null
 }
 

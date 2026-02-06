@@ -29,7 +29,8 @@ $steps = @(
 $pipelineFailed = $false
 foreach($step in $steps){
     $errFile = Join-Path $tmpDir "e1-err-$($step.Name).txt"
-    $proc = Start-Process -FilePath pwsh -ArgumentList (@("-NoProfile","-File",$step.Script) + $step.Args) `
+    $stepArgString = ($step.Args | ForEach-Object { "`"$_`"" }) -join ' '
+    $proc = Start-Process -FilePath pwsh -ArgumentList "-NoProfile -File `"$($step.Script)`" $stepArgString" `
             -Wait -PassThru -RedirectStandardError $errFile -NoNewWindow
     if($proc.ExitCode -ne 0){
         $stderr = if(Test-Path $errFile){ Get-Content -Raw $errFile } else { "" }
@@ -73,7 +74,7 @@ $merkleRoot = Join-Path $outDir 'merkle_root.txt'
 
 $errFile = Join-Path $tmpDir "e3-err.txt"
 $proc = Start-Process -FilePath pwsh `
-    -ArgumentList "-NoProfile","-File",$verifyScript,"-DoD",$dodJson,"-Manifest",$manifest,"-MerkleRoot",$merkleRoot `
+    -ArgumentList "-NoProfile -File `"$verifyScript`" -DoD `"$dodJson`" -Manifest `"$manifest`" -MerkleRoot `"$merkleRoot`"" `
     -Wait -PassThru -RedirectStandardError $errFile -NoNewWindow
 
 if($proc.ExitCode -eq 0){ Pass "E3" "verify.ps1 passes on fresh pipeline output" }

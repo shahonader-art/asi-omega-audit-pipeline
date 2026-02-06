@@ -41,7 +41,7 @@ function New-Pipeline([string]$dir){
     $manifest | ConvertTo-Csv -NoTypeInformation | Set-Content -Encoding UTF8 (Join-Path $outDir 'manifest.csv')
 
     # Compute Merkle root
-    pwsh -NoProfile -File $merkleScript -CsvPath (Join-Path $outDir 'manifest.csv')
+    pwsh -NoProfile -File $merkleScript -CsvPath (Join-Path $outDir 'manifest.csv') | Out-Null
 
     # Create DoD.json that points to the merkle root
     $mr = (Get-Content -Raw (Join-Path $outDir 'merkle_root.txt')).Trim()
@@ -61,7 +61,7 @@ function New-Pipeline([string]$dir){
 function Test-Verify($p){
     $errFile = Join-Path $tmpDir "verr-$([guid]::NewGuid().ToString('N').Substring(0,8)).txt"
     $proc = Start-Process -FilePath pwsh `
-        -ArgumentList "-NoProfile","-File",$verifyScript,"-DoD",$p.DoDJson,"-Manifest",$p.Manifest,"-MerkleRoot",$p.MerkleRoot `
+        -ArgumentList "-NoProfile -File `"$verifyScript`" -DoD `"$($p.DoDJson)`" -Manifest `"$($p.Manifest)`" -MerkleRoot `"$($p.MerkleRoot)`"" `
         -Wait -PassThru -RedirectStandardError $errFile -NoNewWindow
     return $proc.ExitCode
 }
@@ -119,7 +119,7 @@ $rows4 = Import-Csv $p4.Manifest
 $reversed = $rows4[($rows4.Count-1)..0]  # reverse order
 $reversed | ConvertTo-Csv -NoTypeInformation | Set-Content -Encoding UTF8 $p4.Manifest
 # Recompute Merkle root from reordered manifest
-pwsh -NoProfile -File $merkleScript -CsvPath $p4.Manifest
+pwsh -NoProfile -File $merkleScript -CsvPath $p4.Manifest | Out-Null
 # Update DoD to match new root
 $newRoot = (Get-Content -Raw $p4.MerkleRoot).Trim()
 $dod4 = Get-Content -Raw $p4.DoDJson | ConvertFrom-Json
@@ -156,7 +156,7 @@ foreach($f in $fakeFiles){
     $fakeManifest += [pscustomobject]@{ Path=$f.FullName; Rel="sample/$($f.Name)"; SHA256=$h; Size=$f.Length }
 }
 $fakeManifest | ConvertTo-Csv -NoTypeInformation | Set-Content -Encoding UTF8 $p5.Manifest
-pwsh -NoProfile -File $merkleScript -CsvPath $p5.Manifest
+pwsh -NoProfile -File $merkleScript -CsvPath $p5.Manifest | Out-Null
 $fakeRoot = (Get-Content -Raw $p5.MerkleRoot).Trim()
 @{ merkle_root=$fakeRoot; ntp_drift_seconds=0.001; generated=(Get-Date).ToString("o") } |
     ConvertTo-Json | Set-Content -Encoding UTF8 $p5.DoDJson
