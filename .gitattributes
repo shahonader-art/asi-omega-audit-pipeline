@@ -1,1 +1,5 @@
 * text=auto
+
+# Sample files must have identical bytes on all platforms (LF only)
+# Otherwise SHA-256 hashes will differ between Linux and Windows
+sample/** -text

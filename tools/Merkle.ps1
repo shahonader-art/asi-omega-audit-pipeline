@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$CsvPath)
+param([string]$CsvPath = "")
 
 # ASI-Omega Merkle Tree Builder
 # Reads manifest.csv and builds an RFC 6962 compliant Merkle tree.
@@ -9,6 +9,7 @@ $ErrorActionPreference = 'Stop'
 # Load shared crypto library
 . (Join-Path $PSScriptRoot '..\lib\crypto.ps1')
 
+if(-not $CsvPath){ Write-Error "CsvPath is required. Usage: pwsh Merkle.ps1 -CsvPath <path>"; exit 1 }
 if(-not (Test-Path $CsvPath)){ Write-Error "CSV not found: $CsvPath"; exit 2 }
 
 $rows = Import-Csv -Path $CsvPath

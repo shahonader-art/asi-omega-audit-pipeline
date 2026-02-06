@@ -92,6 +92,33 @@ Write-Host "  Dato: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor 
 Write-Host ""
 
 # ─────────────────────────────────────────────────────
+# Pre-flight: fix CRLF line endings in sample files
+# Git on Windows converts LF to CRLF which changes SHA-256 hashes.
+# This normalizes sample files to LF for consistent hashing.
+# ─────────────────────────────────────────────────────
+$sampleDir = Join-Path $repoRoot 'sample'
+if(Test-Path $sampleDir){
+    $fixed = 0
+    Get-ChildItem $sampleDir -Recurse -File | ForEach-Object {
+        $bytes = [System.IO.File]::ReadAllBytes($_.FullName)
+        $hasCrlf = $false
+        for($i = 0; $i -lt $bytes.Length - 1; $i++){
+            if($bytes[$i] -eq 13 -and $bytes[$i+1] -eq 10){ $hasCrlf = $true; break }
+        }
+        if($hasCrlf){
+            $content = [System.IO.File]::ReadAllText($_.FullName)
+            $normalized = $content.Replace("`r`n", "`n")
+            [System.IO.File]::WriteAllBytes($_.FullName, [System.Text.Encoding]::UTF8.GetBytes($normalized))
+            $fixed++
+        }
+    }
+    if($fixed -gt 0){
+        Write-Host "  Fikset linjeskift i $fixed sample-fil(er) (CRLF -> LF)" -ForegroundColor DarkGray
+        Write-Host ""
+    }
+}
+
+# ─────────────────────────────────────────────────────
 # Quick test (selftest + golden hashes)
 # ─────────────────────────────────────────────────────
 if($Only -eq 'all' -or $Only -eq 'quick'){
