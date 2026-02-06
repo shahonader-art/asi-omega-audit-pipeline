@@ -18,4 +18,13 @@ foreach($p in $props){
   $got=$rel2sha[$rel]
   if($got -ne $need){ Write-Host "MISMATCH: $rel"; $fail=$true } else { Write-Host "OK: $rel" -ForegroundColor Green }
 }
+# Reverse check: detect unexpected files in manifest not in golden-hashes
+$goldenRels = @{}
+foreach($p in $props){ $goldenRels[($p.Name -replace '\\','/')] = $true }
+foreach($rel in $rel2sha.Keys){
+  if(-not $goldenRels.ContainsKey($rel)){
+    Write-Host "EXTRA: $rel (in manifest but not in golden-hashes)" -ForegroundColor Yellow
+    $fail=$true
+  }
+}
 if($fail){ Write-Error "SELFTEST FAIL"; exit 10 } else { Write-Host "SELFTEST PASS"; exit 0 }

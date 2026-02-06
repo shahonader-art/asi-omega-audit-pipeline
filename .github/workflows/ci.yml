@@ -9,17 +9,27 @@ jobs:
         run: pwsh -NoProfile -File src/run_demo.ps1 -Out output
       - name: Run tests
         run: pwsh -NoProfile -File tests/selftest.ps1
-
-
-- name: Merkle root
-  run: pwsh -NoProfile -File tools/Merkle.ps1 -CsvPath output/manifest.csv
-- name: DoD report
-  run: pwsh -NoProfile -File tools/DoD.ps1 -Out output/DoD
-- name: Publish artefacts
-  uses: actions/upload-artifact@v4
-  with:
-    name: audit-artifacts
-    path: |
-      output/manifest.csv
-      output/merkle_root.txt
-      output/DoD/**
+      - name: Merkle root
+        run: pwsh -NoProfile -File tools/Merkle.ps1 -CsvPath output/manifest.csv
+      - name: DoD report
+        run: pwsh -NoProfile -File tools/DoD.ps1 -Out output/DoD
+      - name: Test OTS-Stub
+        run: pwsh -NoProfile -File tests/test-ots-stub.ps1
+      - name: Test Sign-DoD
+        run: pwsh -NoProfile -File tests/test-sign-dod.ps1
+      - name: Test meta_gen
+        run: pwsh -NoProfile -File tests/test-meta-gen.ps1
+      - name: Test Merkle edge cases
+        run: pwsh -NoProfile -File tests/test-merkle-edge-cases.ps1
+      - name: Test error paths
+        run: pwsh -NoProfile -File tests/test-error-paths.ps1
+      - name: Test determinism
+        run: pwsh -NoProfile -File tests/test-determinism.ps1
+      - name: Publish artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-artifacts
+          path: |
+            output/manifest.csv
+            output/merkle_root.txt
+            output/DoD/**
