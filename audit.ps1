@@ -1,6 +1,10 @@
 param(
     [string]$Path = "",
     [switch]$Verify,
+    [switch]$Sign,
+    [switch]$Timestamp,
+    [switch]$Full,
+    [string]$GpgKey = "",
     [switch]$Help
 )
 
@@ -27,15 +31,21 @@ if($Help){
     Write-Host "    pwsh audit.ps1                     Auditer sample/-mappen"
     Write-Host "    pwsh audit.ps1 -Path C:\MinMappe   Auditer en vilkaarlig mappe"
     Write-Host "    pwsh audit.ps1 -Verify             Verifiser forrige audit"
+    Write-Host "    pwsh audit.ps1 -Sign               Auditer + GPG-signer"
+    Write-Host "    pwsh audit.ps1 -Timestamp          Auditer + OpenTimestamps"
+    Write-Host "    pwsh audit.ps1 -Full               Auditer + signer + tidsstempel"
     Write-Host ""
     Write-Host "  UTDATA:" -ForegroundColor Yellow
-    Write-Host "    output/manifest.csv      Liste over alle filer + SHA-256 fingeravtrykk"
-    Write-Host "    output/merkle_root.txt   Ett tall som representerer alle filer"
-    Write-Host "    output/DoD/DoD.json      Rapport med tidsstempel og systeminfo"
-    Write-Host "    output/rapport.txt       Lesbar rapport for mennesker"
+    Write-Host "    output/rapport.txt         Lesbar rapport for mennesker"
+    Write-Host "    output/manifest.csv        Fil-fingeravtrykk"
+    Write-Host "    output/merkle_root.txt     Kombinert rot"
+    Write-Host "    output/DoD/DoD.json        Maskinlesbar rapport"
+    Write-Host "    output/*.asc               GPG-signaturer (med -Sign)"
+    Write-Host "    output/ots_receipt.txt     OTS-kvittering (med -Timestamp)"
     Write-Host ""
     Write-Host "  EKSEMPLER:" -ForegroundColor Yellow
     Write-Host '    pwsh audit.ps1 -Path "C:\Prosjekt\leveranse"'
+    Write-Host '    pwsh audit.ps1 -Full -GpgKey AABBCCDD'
     Write-Host '    pwsh audit.ps1 -Verify'
     Write-Host ""
     exit 0
@@ -199,6 +209,52 @@ $report += @"
 
 $report | Set-Content -Encoding UTF8 -Path $reportPath
 
+# ─────────────────────────────────────────────────────
+# Optional: GPG signing
+# ─────────────────────────────────────────────────────
+$signStatus = "Ikke aktivert (kjoer med -Sign eller -Full)"
+if($Sign -or $Full){
+    Write-Host ""
+    Write-Host "  Steg 5: GPG-signering..." -ForegroundColor White
+    $signArgs = @("-AuditDir", $outDir)
+    if($GpgKey){ $signArgs += @("-KeyId", $GpgKey) }
+    else { $signArgs += "-Auto" }
+
+    $signResult = pwsh -NoProfile -File (Join-Path $root 'tools\Sign-Audit.ps1') @signArgs 2>&1
+    if($LASTEXITCODE -eq 0){
+        Write-Host "    Signering fullfoert" -ForegroundColor Green
+        $signStatus = "Signert med GPG-noekkel $GpgKey"
+    } elseif($LASTEXITCODE -eq 10){
+        Write-Host "    GPG ikke installert — hopper over signering" -ForegroundColor Yellow
+        Write-Host "    Installer Gpg4win: https://gpg4win.org" -ForegroundColor Gray
+        $signStatus = "Ikke tilgjengelig (GPG ikke installert)"
+    } else {
+        Write-Host "    Signering feilet (exit $LASTEXITCODE)" -ForegroundColor Yellow
+        $signStatus = "Feilet"
+    }
+}
+
+# ─────────────────────────────────────────────────────
+# Optional: OpenTimestamps
+# ─────────────────────────────────────────────────────
+$otsStatus = "Ikke aktivert (kjoer med -Timestamp eller -Full)"
+if($Timestamp -or $Full){
+    Write-Host ""
+    Write-Host "  Steg 6: OpenTimestamps..." -ForegroundColor White
+    $merkleRootFile = Join-Path $outDir 'merkle_root.txt'
+    $otsResult = pwsh -NoProfile -File (Join-Path $root 'tools\OTS-Stamp.ps1') -Target $merkleRootFile 2>&1
+    if($LASTEXITCODE -eq 0){
+        Write-Host "    Tidsstempel sendt til Bitcoin-nettverket" -ForegroundColor Green
+        $otsStatus = "Sendt til OpenTimestamps (venter paa Bitcoin-bekreftelse)"
+    } elseif($LASTEXITCODE -eq 3){
+        Write-Host "    Kunne ikke naa OTS-servere — lokal stub lagret" -ForegroundColor Yellow
+        $otsStatus = "Feilet (ingen nettverkstilgang) — lokal stub lagret"
+    } else {
+        Write-Host "    OTS feilet (exit $LASTEXITCODE)" -ForegroundColor Yellow
+        $otsStatus = "Feilet"
+    }
+}
+
 # Restore backup if we moved files
 if($backupDir -and (Test-Path $backupDir)){
     $sampleDir = Join-Path $root 'sample'
@@ -215,13 +271,26 @@ Write-Host ""
 Write-Host "  Filer registrert:   $rowCount" -ForegroundColor White
 Write-Host "  Merkle-rot:         $($merkle.Substring(0,16))..." -ForegroundColor White
 Write-Host "  Tidsstempel:        $($dod.generated)" -ForegroundColor White
+Write-Host "  GPG-signering:      $signStatus" -ForegroundColor White
+Write-Host "  OpenTimestamps:     $otsStatus" -ForegroundColor White
 Write-Host ""
 Write-Host "  Utdata:" -ForegroundColor Yellow
 Write-Host "    output\rapport.txt       <-- Les denne!" -ForegroundColor White
 Write-Host "    output\manifest.csv      Fil-fingeravtrykk" -ForegroundColor Gray
 Write-Host "    output\merkle_root.txt   Kombinert rot" -ForegroundColor Gray
 Write-Host "    output\DoD\DoD.json      Maskinlesbar rapport" -ForegroundColor Gray
+if($Sign -or $Full){
+Write-Host "    output\*.asc             GPG-signaturer" -ForegroundColor Gray
+}
+if($Timestamp -or $Full){
+Write-Host "    output\ots_receipt.txt   OTS-kvittering" -ForegroundColor Gray
+}
 Write-Host ""
 Write-Host "  For aa verifisere senere:" -ForegroundColor Yellow
 Write-Host "    pwsh audit.ps1 -Verify" -ForegroundColor White
+if(-not ($Sign -or $Full)){
+Write-Host ""
+Write-Host "  For full juridisk styrke:" -ForegroundColor Yellow
+Write-Host "    pwsh audit.ps1 -Full" -ForegroundColor White
+}
 Write-Host ""

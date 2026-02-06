@@ -25,6 +25,12 @@ jobs:
         run: pwsh -NoProfile -File tests/test-error-paths.ps1
       - name: Test determinism
         run: pwsh -NoProfile -File tests/test-determinism.ps1
+      - name: Test OTS-Stamp
+        run: pwsh -NoProfile -File tests/test-ots-stamp.ps1
+      - name: Test Sign-Audit
+        run: pwsh -NoProfile -File tests/test-sign-audit.ps1
+      - name: Test GUI launch
+        run: pwsh -NoProfile -File tests/test-gui-launch.ps1
       - name: Publish artefacts
         uses: actions/upload-artifact@v4
         with:
