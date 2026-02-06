@@ -8,11 +8,15 @@ param(
     [switch]$Help
 )
 
-# ASI-Omega Audit Pipeline — One-command interface
-# Usage:
-#   pwsh audit.ps1                     → Audit the sample/ folder
-#   pwsh audit.ps1 -Path C:\MinMappe   → Audit any folder
-#   pwsh audit.ps1 -Verify             → Verify a previous audit
+# ASI-Omega Audit Pipeline
+# Kryptografisk integritetskontroll for filer og mapper.
+#
+# Bruk:
+#   pwsh audit.ps1                     Auditer standardmappen (sample/)
+#   pwsh audit.ps1 -Path C:\MinMappe   Auditer en vilkaarlig mappe
+#   pwsh audit.ps1 -Verify             Verifiser en tidligere audit
+#   pwsh audit.ps1 -Full               Full audit med signering og tidsstempel
+#   pwsh audit.ps1 -Help               Vis detaljert hjelp
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -22,31 +26,41 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 # ─────────────────────────────────────────────────────
 if($Help){
     Write-Host ""
-    Write-Host "  ASI-Omega Audit Pipeline" -ForegroundColor Cyan
-    Write-Host "  ========================" -ForegroundColor Cyan
+    Write-Host "  ASI-Omega Audit Pipeline v1.0" -ForegroundColor Cyan
+    Write-Host "  =============================" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  Lager kryptografisk bevis for at filene dine ikke er endret." -ForegroundColor White
+    Write-Host "  Bruker SHA-256 fingeravtrykk og Merkle-tre for manipulasjonssikring." -ForegroundColor Gray
     Write-Host ""
-    Write-Host "  BRUK:" -ForegroundColor Yellow
-    Write-Host "    pwsh audit.ps1                     Auditer sample/-mappen"
-    Write-Host "    pwsh audit.ps1 -Path C:\MinMappe   Auditer en vilkaarlig mappe"
-    Write-Host "    pwsh audit.ps1 -Verify             Verifiser forrige audit"
-    Write-Host "    pwsh audit.ps1 -Sign               Auditer + GPG-signer"
-    Write-Host "    pwsh audit.ps1 -Timestamp          Auditer + OpenTimestamps"
-    Write-Host "    pwsh audit.ps1 -Full               Auditer + signer + tidsstempel"
+    Write-Host "  KOMMANDOER" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "  UTDATA:" -ForegroundColor Yellow
-    Write-Host "    output/rapport.txt         Lesbar rapport for mennesker"
-    Write-Host "    output/manifest.csv        Fil-fingeravtrykk"
-    Write-Host "    output/merkle_root.txt     Kombinert rot"
-    Write-Host "    output/DoD/DoD.json        Maskinlesbar rapport"
-    Write-Host "    output/*.asc               GPG-signaturer (med -Sign)"
-    Write-Host "    output/ots_receipt.txt     OTS-kvittering (med -Timestamp)"
+    Write-Host "    pwsh audit.ps1                     Auditer standardmappen (sample/)" -ForegroundColor White
+    Write-Host "    pwsh audit.ps1 -Path <mappe>       Auditer en vilkaarlig mappe" -ForegroundColor White
+    Write-Host "    pwsh audit.ps1 -Verify             Kontroller at filer er uendret" -ForegroundColor White
+    Write-Host "    pwsh audit.ps1 -Sign               Auditer + GPG-signering" -ForegroundColor White
+    Write-Host "    pwsh audit.ps1 -Timestamp          Auditer + uavhengig tidsstempel" -ForegroundColor White
+    Write-Host "    pwsh audit.ps1 -Full               Alt: audit + signering + tidsstempel" -ForegroundColor White
+    Write-Host "    pwsh audit.ps1 -Help               Denne hjelpteksten" -ForegroundColor White
     Write-Host ""
-    Write-Host "  EKSEMPLER:" -ForegroundColor Yellow
-    Write-Host '    pwsh audit.ps1 -Path "C:\Prosjekt\leveranse"'
-    Write-Host '    pwsh audit.ps1 -Full -GpgKey AABBCCDD'
-    Write-Host '    pwsh audit.ps1 -Verify'
+    Write-Host "  UTDATA" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "    output/rapport.txt         Lesbar rapport" -ForegroundColor White
+    Write-Host "    output/manifest.csv        SHA-256 per fil" -ForegroundColor White
+    Write-Host "    output/merkle_root.txt     Kombinert fingeravtrykk" -ForegroundColor White
+    Write-Host "    output/DoD/DoD.json        Maskinlesbar rapport" -ForegroundColor White
+    Write-Host "    output/*.asc               GPG-signaturer (med -Sign)" -ForegroundColor Gray
+    Write-Host "    output/ots_receipt.txt     Tidsstempel-kvittering (med -Timestamp)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  EKSEMPLER" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host '    pwsh audit.ps1 -Path "C:\Dokumenter\leveranse"' -ForegroundColor White
+    Write-Host '    pwsh audit.ps1 -Full -GpgKey AABBCCDD' -ForegroundColor White
+    Write-Host '    pwsh audit.ps1 -Verify' -ForegroundColor White
+    Write-Host ""
+    Write-Host "  KRAV" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "    PowerShell 7+   https://github.com/PowerShell/PowerShell" -ForegroundColor White
+    Write-Host "    GPG (valgfritt)  https://gpg4win.org  (for -Sign)" -ForegroundColor Gray
     Write-Host ""
     exit 0
 }
@@ -100,7 +114,7 @@ $outDir = Join-Path $root 'output'
 $dodDir = Join-Path $outDir 'DoD'
 
 # Step 1: Generate manifest
-Write-Host "  Steg 1/4: Scanner filer og beregner fingeravtrykk..." -ForegroundColor White
+Write-Host "  [1/4] Scanner filer og beregner fingeravtrykk..." -ForegroundColor White
 if($Path -and $Path -ne ""){
     # Custom path: copy files to sample/ temporarily, or use directly
     if(-not (Test-Path $Path)){
@@ -124,13 +138,13 @@ $rowCount = (Import-Csv (Join-Path $outDir 'manifest.csv')).Count
 Write-Host "    $rowCount filer registrert" -ForegroundColor Green
 
 # Step 2: Merkle tree
-Write-Host "  Steg 2/4: Bygger Merkle-tre..." -ForegroundColor White
+Write-Host "  [2/4] Bygger Merkle-tre..." -ForegroundColor White
 pwsh -NoProfile -File (Join-Path $root 'tools\Merkle.ps1') -CsvPath (Join-Path $outDir 'manifest.csv')
 $merkle = (Get-Content -Raw (Join-Path $outDir 'merkle_root.txt')).Trim()
 Write-Host "    Merkle-rot: $($merkle.Substring(0,16))..." -ForegroundColor Green
 
 # Step 3: Self-test
-Write-Host "  Steg 3/4: Selvtest mot kjente verdier..." -ForegroundColor White
+Write-Host "  [3/4] Selvtest mot kjente verdier..." -ForegroundColor White
 $testResult = pwsh -NoProfile -File (Join-Path $root 'tests\selftest.ps1') 2>&1
 if($LASTEXITCODE -eq 0){
     Write-Host "    Selvtest bestatt" -ForegroundColor Green
@@ -139,7 +153,7 @@ if($LASTEXITCODE -eq 0){
 }
 
 # Step 4: DoD report
-Write-Host "  Steg 4/4: Genererer rapport..." -ForegroundColor White
+Write-Host "  [4/4] Genererer rapport..." -ForegroundColor White
 pwsh -NoProfile -File (Join-Path $root 'tools\DoD.ps1') -Out $dodDir
 
 # Generate human-readable report
@@ -149,20 +163,26 @@ $reportPath = Join-Path $outDir 'rapport.txt'
 
 $report = @"
 ============================================================
-  INTEGRITETSRAPPORT
-  ASI-Omega Audit Pipeline
+  ASI-OMEGA AUDIT PIPELINE
+  Integritetsrapport
 ============================================================
 
-  Dato:        $($dod.generated)
+  Opprettet:   $($dod.generated)
   Tidssone:    $($dod.timezone)
-  Plattform:   $($dod.platform)
+  System:      $($dod.platform)
 
-------------------------------------------------------------
-  MERKLE-ROT (unikt fingeravtrykk for alle filer):
-  $($dod.merkle_root)
-------------------------------------------------------------
+============================================================
+  RESULTAT
+============================================================
 
-  FILER SOM ER REGISTRERT:
+  Merkle-rot:  $($dod.merkle_root)
+
+  Dette er et unikt fingeravtrykk for alle filene nedenfor.
+  Endres en eneste byte i en eneste fil, endres dette tallet.
+
+============================================================
+  REGISTRERTE FILER ($($rows.Count) stk.)
+============================================================
 
 "@
 
@@ -182,28 +202,42 @@ $ntpStatus = if($dod.ntp_drift_seconds -eq 9999 -or $null -eq $dod.ntp_drift_sec
 }
 
 $report += @"
-------------------------------------------------------------
-  TIDSVALIDERING:
-    NTP-drift: $ntpStatus
+============================================================
+  TIDSVALIDERING
+============================================================
 
-------------------------------------------------------------
-  HVORDAN VERIFISERE:
+  NTP-drift: $ntpStatus
 
-  1. Kjoer:  pwsh audit.ps1 -Verify
-  2. Hvis ALLE filer er uendret, faar du:
-     "RESULTAT: Alle filer er uendret. Integriteten er bekreftet."
-  3. Hvis NOE er endret, faar du:
-     "RESULTAT: FEIL FUNNET. Filer kan ha blitt endret."
+============================================================
+  SLIK VERIFISERER DU
+============================================================
 
-------------------------------------------------------------
-  TEKNISK FORKLARING:
+  1. Aapne terminalen i prosjektmappen
+  2. Kjoer:   pwsh audit.ps1 -Verify
+  3. Resultat:
+     - BESTATT  = Alle filer er uendret
+     - FEILET   = En eller flere filer er endret
+
+============================================================
+  HVA BETYR DETTE?
+============================================================
+
+  Denne rapporten er et kryptografisk bevis.
 
   Hver fil faar et unikt SHA-256 fingeravtrykk (64 tegn).
   Alle fingeravtrykk kombineres i et Merkle-tre til EN rot.
   Endrer du en eneste byte i en eneste fil, endres roten.
 
-  Denne rapporten + manifest.csv + merkle_root.txt + DoD.json
-  utgjor til sammen en beviskjede som kan verifiseres uavhengig.
+  Filene du trenger for aa verifisere:
+    - rapport.txt        (denne filen)
+    - manifest.csv       (fingeravtrykk per fil)
+    - merkle_root.txt    (kombinert fingeravtrykk)
+    - DoD/DoD.json       (maskinlesbar rapport)
+
+  Sammen utgjor disse en komplett beviskjede.
+============================================================
+  ASI-Omega Audit Pipeline
+  https://github.com/shahonader-art/asi-omega-audit-pipeline
 ============================================================
 "@
 
@@ -215,7 +249,7 @@ $report | Set-Content -Encoding UTF8 -Path $reportPath
 $signStatus = "Ikke aktivert (kjoer med -Sign eller -Full)"
 if($Sign -or $Full){
     Write-Host ""
-    Write-Host "  Steg 5: GPG-signering..." -ForegroundColor White
+    Write-Host "  [5/6] GPG-signering..." -ForegroundColor White
     $signArgs = @("-AuditDir", $outDir)
     if($GpgKey){ $signArgs += @("-KeyId", $GpgKey) }
     else { $signArgs += "-Auto" }
@@ -240,7 +274,7 @@ if($Sign -or $Full){
 $otsStatus = "Ikke aktivert (kjoer med -Timestamp eller -Full)"
 if($Timestamp -or $Full){
     Write-Host ""
-    Write-Host "  Steg 6: OpenTimestamps..." -ForegroundColor White
+    Write-Host "  [6/6] Uavhengig tidsstempling..." -ForegroundColor White
     $merkleRootFile = Join-Path $outDir 'merkle_root.txt'
     $otsResult = pwsh -NoProfile -File (Join-Path $root 'tools\OTS-Stamp.ps1') -Target $merkleRootFile 2>&1
     if($LASTEXITCODE -eq 0){
@@ -275,10 +309,10 @@ Write-Host "  GPG-signering:      $signStatus" -ForegroundColor White
 Write-Host "  OpenTimestamps:     $otsStatus" -ForegroundColor White
 Write-Host ""
 Write-Host "  Utdata:" -ForegroundColor Yellow
-Write-Host "    output\rapport.txt       <-- Les denne!" -ForegroundColor White
-Write-Host "    output\manifest.csv      Fil-fingeravtrykk" -ForegroundColor Gray
-Write-Host "    output\merkle_root.txt   Kombinert rot" -ForegroundColor Gray
-Write-Host "    output\DoD\DoD.json      Maskinlesbar rapport" -ForegroundColor Gray
+Write-Host "    output\rapport.txt       Lesbar rapport" -ForegroundColor White
+Write-Host "    output\manifest.csv      SHA-256 per fil" -ForegroundColor Gray
+Write-Host "    output\merkle_root.txt   Kombinert fingeravtrykk" -ForegroundColor Gray
+Write-Host "    output\DoD\DoD.json      Maskinlesbar rapport (JSON)" -ForegroundColor Gray
 if($Sign -or $Full){
 Write-Host "    output\*.asc             GPG-signaturer" -ForegroundColor Gray
 }

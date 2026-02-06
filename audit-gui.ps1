@@ -43,7 +43,7 @@ $lblTitle.AutoSize = $true
 $form.Controls.Add($lblTitle)
 
 $lblSub = New-Object System.Windows.Forms.Label
-$lblSub.Text = "Kryptografisk bevis for at filene dine ikke er endret"
+$lblSub.Text = "Bevis at filene dine er ekte og uendret"
 $lblSub.Font = $font
 $lblSub.ForeColor = [System.Drawing.Color]::Gray
 $lblSub.Location = New-Object System.Drawing.Point(20, 50)
@@ -52,7 +52,7 @@ $form.Controls.Add($lblSub)
 
 # ─── Folder selection ───
 $lblFolder = New-Object System.Windows.Forms.Label
-$lblFolder.Text = "Mappe aa auditere:"
+$lblFolder.Text = "Velg mappe:"
 $lblFolder.Font = $fontBold
 $lblFolder.Location = New-Object System.Drawing.Point(20, 90)
 $lblFolder.AutoSize = $true
@@ -86,7 +86,7 @@ $form.Controls.Add($btnBrowse)
 
 # ─── Options ───
 $chkSign = New-Object System.Windows.Forms.CheckBox
-$chkSign.Text = "GPG-signer (krever Gpg4win)"
+$chkSign.Text = "Digital signering (GPG)"
 $chkSign.Font = $font
 $chkSign.ForeColor = $fgColor
 $chkSign.Location = New-Object System.Drawing.Point(20, 155)
@@ -94,7 +94,7 @@ $chkSign.AutoSize = $true
 $form.Controls.Add($chkSign)
 
 $chkOTS = New-Object System.Windows.Forms.CheckBox
-$chkOTS.Text = "Uavhengig tidsstempel (OpenTimestamps)"
+$chkOTS.Text = "Uavhengig tidsstempling"
 $chkOTS.Font = $font
 $chkOTS.ForeColor = $fgColor
 $chkOTS.Location = New-Object System.Drawing.Point(300, 155)
@@ -123,7 +123,7 @@ $btnVerify.FlatStyle = "Flat"
 $form.Controls.Add($btnVerify)
 
 $btnReport = New-Object System.Windows.Forms.Button
-$btnReport.Text = "Aapne Rapport"
+$btnReport.Text = "Vis Rapport"
 $btnReport.Location = New-Object System.Drawing.Point(460, 190)
 $btnReport.Size = New-Object System.Drawing.Size(200, 45)
 $btnReport.Font = $fontBold
@@ -135,7 +135,7 @@ $form.Controls.Add($btnReport)
 
 # ─── Status ───
 $lblStatus = New-Object System.Windows.Forms.Label
-$lblStatus.Text = "Klar til aa starte."
+$lblStatus.Text = "Klar."
 $lblStatus.Font = $fontBold
 $lblStatus.ForeColor = $accentColor
 $lblStatus.Location = New-Object System.Drawing.Point(20, 248)
@@ -167,7 +167,7 @@ function Log($msg){
 
 function Run-Audit {
     $txtLog.Clear()
-    $lblStatus.Text = "Kjoerer audit..."
+    $lblStatus.Text = "Analyserer filer..."
     $lblStatus.ForeColor = $accentColor
     $btnAudit.Enabled = $false
     $btnVerify.Enabled = $false
@@ -213,7 +213,7 @@ function Run-Audit {
 
 function Run-Verify {
     $txtLog.Clear()
-    $lblStatus.Text = "Verifiserer..."
+    $lblStatus.Text = "Kontrollerer integritet..."
     $lblStatus.ForeColor = $accentColor
     $btnAudit.Enabled = $false
     $btnVerify.Enabled = $false

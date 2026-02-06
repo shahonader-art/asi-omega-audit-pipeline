@@ -1,0 +1,12 @@
+# Build output
+dist/
+
+# Audit output (generated at runtime)
+output/
+
+# PowerShell temp files
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
