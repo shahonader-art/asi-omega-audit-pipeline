@@ -82,20 +82,30 @@ if(Test-Path $goldenPath){
 # Test 5: Merkle root is deterministic from known hashes
 # =====================================================================
 if($rowsA.Count -ge 2){
-    # Recompute merkle root manually from manifest hashes
+    # Recompute merkle root manually with RFC 6962 domain separation
+    function Hash-Leaf([string]$data){
+        $dataBytes = [System.Text.Encoding]::UTF8.GetBytes($data)
+        $prefixed = [byte[]]::new(1 + $dataBytes.Length)
+        $prefixed[0] = 0x00
+        [Array]::Copy($dataBytes, 0, $prefixed, 1, $dataBytes.Length)
+        return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($prefixed)) -Algorithm SHA256).Hash.ToLower()
+    }
     function Combine([string]$a,[string]$b){
-        $pair=[System.Text.Encoding]::UTF8.GetBytes($a+$b)
-        (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($pair)) -Algorithm SHA256).Hash.ToLower()
+        $pairBytes=[System.Text.Encoding]::UTF8.GetBytes($a+$b)
+        $prefixed = [byte[]]::new(1 + $pairBytes.Length)
+        $prefixed[0] = 0x01
+        [Array]::Copy($pairBytes, 0, $prefixed, 1, $pairBytes.Length)
+        return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($prefixed)) -Algorithm SHA256).Hash.ToLower()
     }
     $level=[System.Collections.Generic.List[string]]::new()
-    foreach($r in $rowsA){ [void]$level.Add($r.SHA256.ToLower()) }
+    foreach($r in $rowsA){ [void]$level.Add((Hash-Leaf $r.SHA256.ToLower())) }
     while($level.Count -gt 1){
         if($level.Count % 2 -ne 0){ $level.Add($level[$level.Count-1]) }
         $next=[System.Collections.Generic.List[string]]::new()
         for($i=0;$i -lt $level.Count;$i+=2){ $next.Add((Combine $level[$i] $level[$i+1])) }
         $level=$next
     }
-    if($level[0] -eq $rootA){ Pass "Merkle root matches manual recomputation" }
+    if($level[0] -eq $rootA){ Pass "Merkle root matches manual recomputation (RFC 6962)" }
     else { Fail "Merkle root mismatch: script=$rootA manual=$($level[0])" }
 }
 

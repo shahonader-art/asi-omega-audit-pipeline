@@ -11,20 +11,47 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $manifestPath = Join-Path $repoRoot 'output\manifest.csv'
 
 $data = @{
+  schema_version = 2
   name      = "asi-omega-audit-pipeline"
   generated = $now
   timezone  = $tz
   culture   = $culture
   platform  = "PowerShell 7+"
   merkle_root = $null
+  merkle_algorithm = "SHA-256 with RFC 6962 domain separation"
   ntp_drift_seconds = $null
   artefacts = @{
     manifest_csv = (Test-Path $manifestPath)
     golden_hashes = (Test-Path (Join-Path $repoRoot 'docs\golden-hashes.json'))
   }
+  script_hashes = @{}
 }
 
+# ─────────────────────────────────────────────────────
+# Script integrity: hash all pipeline scripts
+# ─────────────────────────────────────────────────────
+$pipelineScripts = @(
+    'src\run_demo.ps1',
+    'tools\Merkle.ps1',
+    'tools\verify.ps1',
+    'tools\DoD.ps1',
+    'tools\NtpDrift.ps1',
+    'tools\Sign-Audit.ps1',
+    'tools\OTS-Stamp.ps1'
+)
+
+foreach($s in $pipelineScripts){
+    $scriptPath = Join-Path $repoRoot $s
+    if(Test-Path $scriptPath){
+        $h = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath).Hash.ToLower()
+        $relPath = $s.Replace('\','/')
+        $data.script_hashes[$relPath] = $h
+    }
+}
+
+# ─────────────────────────────────────────────────────
 # Compute Merkle root if manifest exists
+# ─────────────────────────────────────────────────────
 if(Test-Path $manifestPath){
     $merkleOut = pwsh -NoProfile -File (Join-Path $repoRoot 'tools\Merkle.ps1') -CsvPath $manifestPath 2>&1
     if($LASTEXITCODE -ne 0){
@@ -42,7 +69,9 @@ if(Test-Path $manifestPath){
     Write-Host "WARNING: manifest.csv not found at $manifestPath — skipping Merkle" -ForegroundColor Yellow
 }
 
+# ─────────────────────────────────────────────────────
 # NTP drift seconds (average)
+# ─────────────────────────────────────────────────────
 $ntpResult = pwsh -NoProfile -File (Join-Path $repoRoot 'tools\NtpDrift.ps1') 2>&1
 $ntpVal = "$ntpResult".Trim()
 try {

@@ -1,5 +1,5 @@
-# Criterion 3: MERKLE TREE CORRECTNESS
-# The Merkle tree must be cryptographically sound.
+# Criterion 3: MERKLE TREE CORRECTNESS (RFC 6962)
+# The Merkle tree must be cryptographically sound with domain separation.
 $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $merkleScript = Join-Path $repoRoot 'tools\Merkle.ps1'
@@ -10,9 +10,21 @@ $fail = $false
 function Pass($id,$m){ Write-Host "PASS [$id]: $m" -ForegroundColor Green }
 function Fail($id,$m){ Write-Host "FAIL [$id]: $m" -ForegroundColor Red; $script:fail=$true }
 
-function Hash-Pair([string]$a,[string]$b){
-    $pair = [System.Text.Encoding]::UTF8.GetBytes($a + $b)
-    (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($pair)) -Algorithm SHA256).Hash.ToLower()
+# RFC 6962 compliant helper functions (must match Merkle.ps1)
+function Hash-Leaf([string]$data){
+    $dataBytes = [System.Text.Encoding]::UTF8.GetBytes($data)
+    $prefixed = [byte[]]::new(1 + $dataBytes.Length)
+    $prefixed[0] = 0x00
+    [Array]::Copy($dataBytes, 0, $prefixed, 1, $dataBytes.Length)
+    return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($prefixed)) -Algorithm SHA256).Hash.ToLower()
+}
+
+function Hash-Internal([string]$a,[string]$b){
+    $pairBytes = [System.Text.Encoding]::UTF8.GetBytes($a + $b)
+    $prefixed = [byte[]]::new(1 + $pairBytes.Length)
+    $prefixed[0] = 0x01
+    [Array]::Copy($pairBytes, 0, $prefixed, 1, $pairBytes.Length)
+    return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($prefixed)) -Algorithm SHA256).Hash.ToLower()
 }
 
 function Write-TestCsv([string]$path, [string[]]$hashes){
@@ -36,36 +48,40 @@ $hC = "c" * 64
 $hD = "d" * 64
 
 # =====================================================================
-# M1: Single leaf — root == leaf hash
+# M1: Single leaf — root == Hash-Leaf(leaf)
+# With RFC 6962, root is NOT the raw leaf — it includes 0x00 prefix
 # =====================================================================
 $csv1 = Join-Path $tmpDir 'm1.csv'
 Write-TestCsv $csv1 @($hA)
 $root1 = Get-MerkleRoot $csv1
-if($root1 -eq $hA){ Pass "M1" "Single leaf: root equals leaf hash" }
-else { Fail "M1" "Single leaf: expected $hA, got $root1" }
+$expected1 = Hash-Leaf $hA
+if($root1 -eq $expected1){ Pass "M1" "Single leaf: root = Hash-Leaf(leaf) with domain separation" }
+else { Fail "M1" "Single leaf: expected $expected1, got $root1" }
 
 # =====================================================================
-# M2: Two leaves — root == Hash(L0 + L1)
+# M2: Two leaves — root = Hash-Internal(Hash-Leaf(L0), Hash-Leaf(L1))
 # =====================================================================
 $csv2 = Join-Path $tmpDir 'm2.csv'
 Write-TestCsv $csv2 @($hA, $hB)
 $root2 = Get-MerkleRoot $csv2
-$expected2 = Hash-Pair $hA $hB
-if($root2 -eq $expected2){ Pass "M2" "Two leaves: root = Hash(L0+L1)" }
+$leafA = Hash-Leaf $hA
+$leafB = Hash-Leaf $hB
+$expected2 = Hash-Internal $leafA $leafB
+if($root2 -eq $expected2){ Pass "M2" "Two leaves: correct with domain separation" }
 else { Fail "M2" "Two leaves: expected $expected2, got $root2" }
 
 # =====================================================================
 # M3: Odd leaves — padding must be deterministic
-# Three leaves: [A, B, C] -> padded to [A, B, C, C]
-# Level 1: [Hash(A+B), Hash(C+C)]
-# Level 2: Hash(Hash(A+B) + Hash(C+C))
 # =====================================================================
 $csv3 = Join-Path $tmpDir 'm3.csv'
 Write-TestCsv $csv3 @($hA, $hB, $hC)
 $root3 = Get-MerkleRoot $csv3
-$left3 = Hash-Pair $hA $hB
-$right3 = Hash-Pair $hC $hC
-$expected3 = Hash-Pair $left3 $right3
+$lA = Hash-Leaf $hA
+$lB = Hash-Leaf $hB
+$lC = Hash-Leaf $hC
+$left3 = Hash-Internal $lA $lB
+$right3 = Hash-Internal $lC $lC
+$expected3 = Hash-Internal $left3 $right3
 if($root3 -eq $expected3){ Pass "M3" "Odd leaves: padding is deterministic and correct" }
 else { Fail "M3" "Odd leaves: expected $expected3, got $root3" }
 
@@ -99,6 +115,16 @@ $root5a = Get-MerkleRoot $csv5a
 $root5b = Get-MerkleRoot $csv5b
 if($root5a -ne $root5b){ Pass "M5" "Swapping two leaves changes the root (order-sensitive)" }
 else { Fail "M5" "Swapping leaves A<->B did NOT change root — tree is order-insensitive!" }
+
+# =====================================================================
+# M6: Domain separation — leaf != internal node hash
+# This is the key RFC 6962 security property
+# =====================================================================
+$testData = "a" * 64
+$leafResult = Hash-Leaf $testData
+$internalResult = Hash-Internal $testData $testData
+if($leafResult -ne $internalResult){ Pass "M6" "Domain separation: leaf hash != internal hash (RFC 6962)" }
+else { Fail "M6" "Domain separation FAILED: leaf hash == internal hash" }
 
 # Cleanup
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue

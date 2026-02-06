@@ -8,10 +8,21 @@ $fail = $false
 function Pass($m){ Write-Host "OK: $m" -ForegroundColor Green }
 function Fail($m){ Write-Host "FAIL: $m" -ForegroundColor Red; $script:fail=$true }
 
-# Helper: compute SHA-256 of a string (same logic as Merkle.ps1's Combine-Hash)
-function Hash-String([string]$s){
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($s)
-    return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($bytes)) -Algorithm SHA256).Hash.ToLower()
+# RFC 6962 compliant helper functions (must match Merkle.ps1)
+function Hash-Leaf([string]$data){
+    $dataBytes = [System.Text.Encoding]::UTF8.GetBytes($data)
+    $prefixed = [byte[]]::new(1 + $dataBytes.Length)
+    $prefixed[0] = 0x00
+    [Array]::Copy($dataBytes, 0, $prefixed, 1, $dataBytes.Length)
+    return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($prefixed)) -Algorithm SHA256).Hash.ToLower()
+}
+
+function Hash-Internal([string]$a, [string]$b){
+    $pairBytes = [System.Text.Encoding]::UTF8.GetBytes($a + $b)
+    $prefixed = [byte[]]::new(1 + $pairBytes.Length)
+    $prefixed[0] = 0x01
+    [Array]::Copy($pairBytes, 0, $prefixed, 1, $pairBytes.Length)
+    return (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($prefixed)) -Algorithm SHA256).Hash.ToLower()
 }
 
 # Helper: write a CSV with given hashes
@@ -24,18 +35,20 @@ function Write-TestCsv([string]$path, [string[]]$hashes){
 }
 
 # ======================================================================
-# Test 1: Single leaf — root should equal the leaf hash itself
+# Test 1: Single leaf — root = Hash-Leaf(hash)
+# With RFC 6962: root = SHA-256(0x00 || leaf)
 # ======================================================================
 $csv1 = Join-Path $tmpDir 'single.csv'
 $h1 = "aaaa" * 16  # 64-char fake hash
 Write-TestCsv $csv1 @($h1)
 pwsh -NoProfile -File $merkleScript -CsvPath $csv1
 $root1 = (Get-Content -Raw (Join-Path $tmpDir 'merkle_root.txt')).Trim().ToLower()
-if($root1 -eq $h1){ Pass "Single leaf: root == leaf" }
-else { Fail "Single leaf: expected $h1, got $root1" }
+$expected1 = Hash-Leaf $h1
+if($root1 -eq $expected1){ Pass "Single leaf: root == Hash-Leaf(leaf)" }
+else { Fail "Single leaf: expected $expected1, got $root1" }
 
 # ======================================================================
-# Test 2: Two leaves — root = Hash(leaf0 + leaf1)
+# Test 2: Two leaves — root = Hash-Internal(Hash-Leaf(L0), Hash-Leaf(L1))
 # ======================================================================
 $csv2 = Join-Path $tmpDir 'two.csv'
 $h2a = "bbbb" * 16
@@ -43,15 +56,18 @@ $h2b = "cccc" * 16
 Write-TestCsv $csv2 @($h2a, $h2b)
 pwsh -NoProfile -File $merkleScript -CsvPath $csv2
 $root2 = (Get-Content -Raw (Join-Path $tmpDir 'merkle_root.txt')).Trim().ToLower()
-$expected2 = Hash-String ($h2a + $h2b)
-if($root2 -eq $expected2){ Pass "Two leaves: root = Hash(L0+L1)" }
+$leaf2a = Hash-Leaf $h2a
+$leaf2b = Hash-Leaf $h2b
+$expected2 = Hash-Internal $leaf2a $leaf2b
+if($root2 -eq $expected2){ Pass "Two leaves: root = Hash-Internal(Leaf0, Leaf1)" }
 else { Fail "Two leaves: expected $expected2, got $root2" }
 
 # ======================================================================
 # Test 3: Three leaves (odd count) — tests duplicate-last-leaf padding
-# Per algorithm: [L0, L1, L2] -> pad -> [L0, L1, L2, L2]
-# Level 1: [Hash(L0+L1), Hash(L2+L2)]
-# Level 2: Hash( Hash(L0+L1) + Hash(L2+L2) )
+# Leaves: [Hash-Leaf(L0), Hash-Leaf(L1), Hash-Leaf(L2)]
+# Padded: [HL0, HL1, HL2, HL2]
+# Level 1: [Hash-Internal(HL0,HL1), Hash-Internal(HL2,HL2)]
+# Level 2: Hash-Internal(left, right)
 # ======================================================================
 $csv3 = Join-Path $tmpDir 'three.csv'
 $h3a = "1111" * 16
@@ -60,16 +76,17 @@ $h3c = "3333" * 16
 Write-TestCsv $csv3 @($h3a, $h3b, $h3c)
 pwsh -NoProfile -File $merkleScript -CsvPath $csv3
 $root3 = (Get-Content -Raw (Join-Path $tmpDir 'merkle_root.txt')).Trim().ToLower()
-$left  = Hash-String ($h3a + $h3b)
-$right = Hash-String ($h3c + $h3c)  # duplicated last leaf
-$expected3 = Hash-String ($left + $right)
+$leaf3a = Hash-Leaf $h3a
+$leaf3b = Hash-Leaf $h3b
+$leaf3c = Hash-Leaf $h3c
+$left3  = Hash-Internal $leaf3a $leaf3b
+$right3 = Hash-Internal $leaf3c $leaf3c  # duplicated last
+$expected3 = Hash-Internal $left3 $right3
 if($root3 -eq $expected3){ Pass "Three leaves (odd): padding correct" }
 else { Fail "Three leaves: expected $expected3, got $root3" }
 
 # ======================================================================
 # Test 4: Four leaves — balanced tree, no padding needed
-# Level 1: [Hash(L0+L1), Hash(L2+L3)]
-# Level 2: Hash( Hash(L0+L1) + Hash(L2+L3) )
 # ======================================================================
 $csv4 = Join-Path $tmpDir 'four.csv'
 $h4a = "aaaa" * 16
@@ -79,9 +96,13 @@ $h4d = "dddd" * 16
 Write-TestCsv $csv4 @($h4a, $h4b, $h4c, $h4d)
 pwsh -NoProfile -File $merkleScript -CsvPath $csv4
 $root4 = (Get-Content -Raw (Join-Path $tmpDir 'merkle_root.txt')).Trim().ToLower()
-$left4  = Hash-String ($h4a + $h4b)
-$right4 = Hash-String ($h4c + $h4d)
-$expected4 = Hash-String ($left4 + $right4)
+$leaf4a = Hash-Leaf $h4a
+$leaf4b = Hash-Leaf $h4b
+$leaf4c = Hash-Leaf $h4c
+$leaf4d = Hash-Leaf $h4d
+$left4  = Hash-Internal $leaf4a $leaf4b
+$right4 = Hash-Internal $leaf4c $leaf4d
+$expected4 = Hash-Internal $left4 $right4
 if($root4 -eq $expected4){ Pass "Four leaves: balanced tree correct" }
 else { Fail "Four leaves: expected $expected4, got $root4" }
 
@@ -93,16 +114,32 @@ $h5 = @("1111","2222","3333","4444","5555") | ForEach-Object { $_ * 16 }
 Write-TestCsv $csv5 $h5
 pwsh -NoProfile -File $merkleScript -CsvPath $csv5
 $root5 = (Get-Content -Raw (Join-Path $tmpDir 'merkle_root.txt')).Trim().ToLower()
-# Manually compute: 5 leaves -> pad to 6 -> [L0,L1,L2,L3,L4,L4(dup)]
-$p01 = Hash-String ($h5[0] + $h5[1])
-$p23 = Hash-String ($h5[2] + $h5[3])
-$p44 = Hash-String ($h5[4] + $h5[4])  # duplicated last
-# Level 2: 3 nodes -> pad to 4 -> [p01, p23, p44, p44(dup)]
-$q0 = Hash-String ($p01 + $p23)
-$q1 = Hash-String ($p44 + $p44)
-$expected5 = Hash-String ($q0 + $q1)
+$leafs5 = @()
+foreach($h in $h5){ $leafs5 += (Hash-Leaf $h) }
+$p01 = Hash-Internal $leafs5[0] $leafs5[1]
+$p23 = Hash-Internal $leafs5[2] $leafs5[3]
+$p44 = Hash-Internal $leafs5[4] $leafs5[4]  # duplicated last
+$q0 = Hash-Internal $p01 $p23
+$q1 = Hash-Internal $p44 $p44
+$expected5 = Hash-Internal $q0 $q1
 if($root5 -eq $expected5){ Pass "Five leaves: multi-level padding correct" }
 else { Fail "Five leaves: expected $expected5, got $root5" }
+
+# ======================================================================
+# Test 6: Domain separation — leaf hash != raw hash
+# This is the key security property: a leaf node cannot be confused
+# with an internal node
+# ======================================================================
+$rawHash = "aaaa" * 16
+$leafHash = Hash-Leaf $rawHash
+# Compute what an old (non-RFC 6962) implementation would produce
+$oldBytes = [System.Text.Encoding]::UTF8.GetBytes($rawHash)
+$oldHash = (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($oldBytes)) -Algorithm SHA256).Hash.ToLower()
+if($leafHash -ne $rawHash -and $leafHash -ne $oldHash){
+    Pass "Domain separation: leaf hash differs from raw hash"
+} else {
+    Fail "Domain separation: leaf hash should NOT equal raw hash"
+}
 
 # Cleanup
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
