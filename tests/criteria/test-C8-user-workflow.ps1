@@ -14,16 +14,25 @@ function Fail($id,$m){ Write-Host "FAIL [$id]: $m" -ForegroundColor Red; $script
 function Gap($id,$m){ Write-Host "KNOWN-GAP [$id]: $m" -ForegroundColor Yellow; $script:gap=$true }
 
 # Helper: run audit.ps1 with args, capture output and exit code
-# Uses pwsh -Command with explicit exit code file to avoid Start-Process issues in PS 7.5
+# Uses a wrapper script that calls audit.ps1 via pwsh -File (separate process).
+# This way audit.ps1's 'exit N' terminates the INNER pwsh, not the wrapper,
+# so the wrapper can capture $LASTEXITCODE and write it to a file.
 function Run-Audit([string[]]$Args){
     $uid = [guid]::NewGuid().ToString('N').Substring(0,8)
-    $outFile = Join-Path $tmpDir "audit-out-$uid.txt"
-    $exitFile = Join-Path $tmpDir "audit-exit-$uid.txt"
+    $wrapperPath = Join-Path $tmpDir "wrap-$uid.ps1"
+    $exitFile = Join-Path $tmpDir "exit-$uid.txt"
+    $outFile = Join-Path $tmpDir "out-$uid.txt"
     $argParts = ($Args | ForEach-Object { "`"$_`"" }) -join ' '
-    $cmd = "`$PSNativeCommandUseErrorActionPreference = `$false; & '$auditScript' $argParts *>&1; `$LASTEXITCODE | Set-Content -Path '$exitFile'"
-    pwsh -NoProfile -Command $cmd > $outFile 2>&1
+    @"
+`$PSNativeCommandUseErrorActionPreference = `$false
+pwsh -NoProfile -File '$auditScript' $argParts 2>&1
+`$LASTEXITCODE | Set-Content -Path '$exitFile'
+"@ | Set-Content -Encoding UTF8 $wrapperPath
+    $proc = Start-Process -FilePath pwsh `
+        -ArgumentList "-NoProfile -File `"$wrapperPath`"" `
+        -Wait -PassThru -RedirectStandardOutput $outFile -NoNewWindow
     $stdout = if(Test-Path $outFile){ Get-Content -Raw $outFile } else { "" }
-    $ec = if(Test-Path $exitFile){ [int](Get-Content -Raw $exitFile).Trim() } else { $LASTEXITCODE }
+    $ec = if(Test-Path $exitFile){ [int](Get-Content -Raw $exitFile).Trim() } else { $proc.ExitCode }
     return @{ ExitCode=$ec; Output=$stdout }
 }
 
