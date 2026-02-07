@@ -8,7 +8,8 @@ $tests = @(
     @{ Id="C4"; Name="NO SILENT FAILURES";    Script="test-C4-silent-failures.ps1" },
     @{ Id="C5"; Name="TIMESTAMP TRUST";       Script="test-C5-timestamp.ps1" },
     @{ Id="C6"; Name="END-TO-END CHAIN";      Script="test-C6-end-to-end.ps1" },
-    @{ Id="C7"; Name="CRYPTO STRESS";        Script="test-C7-crypto-stress.ps1" }
+    @{ Id="C7"; Name="CRYPTO STRESS";        Script="test-C7-crypto-stress.ps1" },
+    @{ Id="C8"; Name="USER WORKFLOW";        Script="test-C8-user-workflow.ps1" }
 )
 
 $results = @()
