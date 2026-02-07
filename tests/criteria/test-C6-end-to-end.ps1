@@ -20,10 +20,11 @@ $verifyScript = Join-Path $repoRoot 'tools\verify.ps1'
 # =====================================================================
 # E1: Full pipeline runs all steps without error
 # =====================================================================
+$manifestCsv = Join-Path $outDir 'manifest.csv'
 $steps = @(
     @{ Name="run_demo"; Script=$demoScript; Args=@("-Out",$outDir) },
-    @{ Name="Merkle";   Script=$merkleScript; Args=@("-CsvPath",(Join-Path $outDir 'manifest.csv')) },
-    @{ Name="DoD";      Script=$dodScript; Args=@("-Out",$dodDir) }
+    @{ Name="Merkle";   Script=$merkleScript; Args=@("-CsvPath",$manifestCsv) },
+    @{ Name="DoD";      Script=$dodScript; Args=@("-Out",$dodDir,"-Manifest",$manifestCsv) }
 )
 
 $pipelineFailed = $false
@@ -42,7 +43,7 @@ foreach($step in $steps){
 }
 
 if($pipelineFailed){
-    Write-Error "CRITERION 6: Pipeline failed, cannot continue with remaining tests"
+    Write-Host "CRITERION 6: Pipeline failed, cannot continue with remaining tests" -ForegroundColor Red
     exit 1
 }
 
@@ -73,9 +74,10 @@ $manifest = Join-Path $outDir 'manifest.csv'
 $merkleRoot = Join-Path $outDir 'merkle_root.txt'
 
 $errFile = Join-Path $tmpDir "e3-err.txt"
+$outVerify = Join-Path $tmpDir "e3-out.txt"
 $proc = Start-Process -FilePath pwsh `
     -ArgumentList "-NoProfile -File `"$verifyScript`" -DoD `"$dodJson`" -Manifest `"$manifest`" -MerkleRoot `"$merkleRoot`"" `
-    -Wait -PassThru -RedirectStandardError $errFile -NoNewWindow
+    -Wait -PassThru -RedirectStandardError $errFile -RedirectStandardOutput $outVerify -NoNewWindow
 
 if($proc.ExitCode -eq 0){ Pass "E3" "verify.ps1 passes on fresh pipeline output" }
 else {
@@ -144,6 +146,6 @@ if($hashMismatches -eq 0 -and $rows.Count -gt 0){
 # Cleanup
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 
-if($fail){ Write-Error "CRITERION 6 (END-TO-END): FAILED"; exit 1 }
+if($fail){ Write-Host "CRITERION 6 (END-TO-END): FAILED" -ForegroundColor Red; exit 1 }
 if($gap){ Write-Host "CRITERION 6 (END-TO-END): KNOWN GAPS FOUND"; exit 2 }
 Write-Host "CRITERION 6 (END-TO-END): PASS" -ForegroundColor Green; exit 0

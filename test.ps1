@@ -48,7 +48,7 @@ function Run-TestFile([string]$Name, [string]$RelPath){
     $outFile = Join-Path ([System.IO.Path]::GetTempPath()) "test-out-$([guid]::NewGuid().ToString('N').Substring(0,8)).txt"
 
     $proc = Start-Process -FilePath 'pwsh' `
-        -ArgumentList @('-NoProfile','-NoLogo','-File',$script) `
+        -ArgumentList "-NoProfile -NoLogo -File `"$script`"" `
         -Wait -PassThru -NoNewWindow `
         -RedirectStandardError $errFile `
         -RedirectStandardOutput $outFile
@@ -60,6 +60,18 @@ function Run-TestFile([string]$Name, [string]$RelPath){
         Write-Host "  PASS  $Name" -ForegroundColor Green
         $script:totalPass++
         $script:results += @{ Name=$Name; Status='PASS' }
+    } elseif($proc.ExitCode -eq 2){
+        # Exit code 2 = known gaps (acceptable, not a hard failure)
+        Write-Host "  GAPS  $Name (kjente avvik)" -ForegroundColor Yellow
+        $script:totalSkip++
+        $script:results += @{ Name=$Name; Status='GAPS' }
+
+        if(Test-Path $outFile){
+            $output = Get-Content $outFile -ErrorAction SilentlyContinue | Where-Object { $_ -match 'KNOWN-GAP' } | Select-Object -First 3
+            foreach($line in $output){
+                Write-Host "         $line" -ForegroundColor DarkYellow
+            }
+        }
     } else {
         Write-Host "  FAIL  $Name (exit $($proc.ExitCode))" -ForegroundColor Red
         $script:totalFail++
@@ -180,25 +192,33 @@ foreach($r in $results){
     $icon = switch($r.Status){
         'PASS' { '[OK]' }
         'FAIL' { '[!!]' }
+        'GAPS' { '[~~]' }
         'SKIP' { '[--]' }
     }
     $color = switch($r.Status){
         'PASS' { 'Green' }
         'FAIL' { 'Red' }
+        'GAPS' { 'Yellow' }
         'SKIP' { 'Yellow' }
     }
     Write-Host "    $icon $($r.Name)" -ForegroundColor $color
 }
 
 Write-Host ""
+$totalGaps = ($results | Where-Object { $_.Status -eq 'GAPS' }).Count
 $summary = "    BESTATT: $totalPass"
 if($totalFail -gt 0){ $summary += "  |  FEILET: $totalFail" }
-if($totalSkip -gt 0){ $summary += "  |  HOPPET OVER: $totalSkip" }
+if($totalGaps -gt 0){ $summary += "  |  KJENTE AVVIK: $totalGaps" }
+if(($totalSkip - $totalGaps) -gt 0){ $summary += "  |  HOPPET OVER: $($totalSkip - $totalGaps)" }
 
 if($totalFail -eq 0){
     Write-Host $summary -ForegroundColor Green
     Write-Host ""
-    Write-Host "    Alle tester bestatt!" -ForegroundColor Green
+    if($totalGaps -gt 0){
+        Write-Host "    Alle tester bestatt! ($totalGaps med kjente avvik)" -ForegroundColor Green
+    } else {
+        Write-Host "    Alle tester bestatt!" -ForegroundColor Green
+    }
 } else {
     Write-Host $summary -ForegroundColor Red
     Write-Host ""

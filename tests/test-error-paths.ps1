@@ -106,6 +106,6 @@ else { Fail "verify: expected exit 2 on DoD missing merkle_root, got $code" }
 # Cleanup
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 
-if($fail){ Write-Error "ERROR-PATH TESTS FAILED"; exit 1 }
+if($fail){ Write-Host "ERROR-PATH TESTS FAILED" -ForegroundColor Red; exit 1 }
 Write-Host "ERROR-PATH TESTS PASS" -ForegroundColor Green
 exit 0

@@ -110,6 +110,6 @@ else { Fail "S4b" "Merkle.ps1 exits 0 on malformed CSV — silent failure" }
 # Cleanup
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 
-if($fail){ Write-Error "CRITERION 4 (NO SILENT FAILURES): FAILED"; exit 1 }
+if($fail){ Write-Host "CRITERION 4 (NO SILENT FAILURES): FAILED" -ForegroundColor Red; exit 1 }
 if($gap){ Write-Host "CRITERION 4 (NO SILENT FAILURES): KNOWN GAPS FOUND"; exit 2 }
 Write-Host "CRITERION 4 (NO SILENT FAILURES): PASS" -ForegroundColor Green; exit 0

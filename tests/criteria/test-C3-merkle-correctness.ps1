@@ -119,5 +119,5 @@ else { Fail "M6" "Domain separation FAILED: leaf hash == internal hash" }
 # Cleanup
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 
-if($fail){ Write-Error "CRITERION 3 (MERKLE CORRECTNESS): FAILED"; exit 1 }
+if($fail){ Write-Host "CRITERION 3 (MERKLE CORRECTNESS): FAILED" -ForegroundColor Red; exit 1 }
 Write-Host "CRITERION 3 (MERKLE CORRECTNESS): PASS" -ForegroundColor Green; exit 0

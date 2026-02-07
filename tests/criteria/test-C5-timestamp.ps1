@@ -21,7 +21,8 @@ New-Item -ItemType Directory -Force -Path $dodDir | Out-Null
 
 # We need a manifest for DoD to work
 pwsh -NoProfile -File (Join-Path $repoRoot 'src\run_demo.ps1') -Out $outDir | Out-Null
-pwsh -NoProfile -File (Join-Path $repoRoot 'tools\DoD.ps1') -Out $dodDir | Out-Null
+$manifestCsv = Join-Path $outDir 'manifest.csv'
+pwsh -NoProfile -File (Join-Path $repoRoot 'tools\DoD.ps1') -Out $dodDir -Manifest $manifestCsv | Out-Null
 
 $dodPath = Join-Path $dodDir 'DoD.json'
 if(Test-Path $dodPath){
@@ -117,6 +118,6 @@ if(Test-Path $merkleRootFile){
 # Cleanup
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 
-if($fail){ Write-Error "CRITERION 5 (TIMESTAMP TRUSTWORTHINESS): FAILED"; exit 1 }
+if($fail){ Write-Host "CRITERION 5 (TIMESTAMP TRUSTWORTHINESS): FAILED" -ForegroundColor Red; exit 1 }
 if($gap){ Write-Host "CRITERION 5 (TIMESTAMP TRUSTWORTHINESS): KNOWN GAPS FOUND"; exit 2 }
 Write-Host "CRITERION 5 (TIMESTAMP TRUSTWORTHINESS): PASS" -ForegroundColor Green; exit 0

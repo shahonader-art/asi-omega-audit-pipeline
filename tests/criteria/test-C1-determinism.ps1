@@ -71,6 +71,6 @@ if($demoSrc -match 'Sort-Object|Sort\b|\| sort\b'){
 # Cleanup
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 
-if($fail){ Write-Error "CRITERION 1 (DETERMINISM): FAILED"; exit 1 }
+if($fail){ Write-Host "CRITERION 1 (DETERMINISM): FAILED" -ForegroundColor Red; exit 1 }
 if($gap){ Write-Host "CRITERION 1 (DETERMINISM): KNOWN GAPS FOUND"; exit 2 }
 Write-Host "CRITERION 1 (DETERMINISM): PASS" -ForegroundColor Green; exit 0

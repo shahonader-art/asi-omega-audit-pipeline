@@ -96,6 +96,6 @@ if($rowsA.Count -ge 2){
 # Cleanup
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 
-if($fail){ Write-Error "DETERMINISM TESTS FAILED"; exit 1 }
+if($fail){ Write-Host "DETERMINISM TESTS FAILED" -ForegroundColor Red; exit 1 }
 Write-Host "DETERMINISM TESTS PASS" -ForegroundColor Green
 exit 0

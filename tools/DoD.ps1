@@ -1,4 +1,7 @@
-param([string]$Out = "output\DoD")
+param(
+    [string]$Out = "output\DoD",
+    [string]$Manifest = ""
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -12,7 +15,7 @@ $tz  = (Get-TimeZone).Id
 $culture = (Get-Culture).Name
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
-$manifestPath = Join-Path $repoRoot 'output\manifest.csv'
+$manifestPath = if($Manifest -and (Test-Path $Manifest)){ Resolve-Path $Manifest } else { Join-Path $repoRoot 'output\manifest.csv' }
 
 $data = @{
   schema_version = 2
@@ -57,17 +60,23 @@ foreach($s in $pipelineScripts){
 # Compute Merkle root if manifest exists
 # ─────────────────────────────────────────────────────
 if(Test-Path $manifestPath){
-    $merkleOut = pwsh -NoProfile -File (Join-Path $repoRoot 'tools\Merkle.ps1') -CsvPath $manifestPath 2>&1
-    if($LASTEXITCODE -ne 0){
-        Write-Host "WARNING: Merkle computation failed (exit $LASTEXITCODE): $merkleOut" -ForegroundColor Yellow
-        $data.merkle_root = $null
-    } else {
-        $mrPath = Join-Path $repoRoot 'output\merkle_root.txt'
-        if(Test-Path $mrPath){
-            $data.merkle_root = (Get-Content -Raw -Path $mrPath).Trim()
-        } else {
-            Write-Host "WARNING: Merkle script ran but merkle_root.txt not found" -ForegroundColor Yellow
+    # Compute Merkle root using shared library directly (no subprocess)
+    $csvRows = Import-Csv -Path $manifestPath
+    if($csvRows -and $csvRows.Count -gt 0){
+        $leafHashes = @()
+        foreach($r in $csvRows){
+            if($r.Rel -and $r.SHA256){ $leafHashes += $r.SHA256.ToLower() }
         }
+        if($leafHashes.Count -gt 0){
+            $data.merkle_root = Build-MerkleTree $leafHashes
+            # Also write merkle_root.txt next to manifest
+            $mrDir = Split-Path -Parent (Resolve-Path $manifestPath)
+            $data.merkle_root | Set-Content -Encoding ASCII -Path (Join-Path $mrDir 'merkle_root.txt')
+        } else {
+            Write-Host "WARNING: manifest.csv has no valid Rel/SHA256 rows" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "WARNING: manifest.csv is empty" -ForegroundColor Yellow
     }
 } else {
     Write-Host "WARNING: manifest.csv not found at $manifestPath — skipping Merkle" -ForegroundColor Yellow

@@ -134,6 +134,6 @@ if($leafHash -ne $rawHash -and $leafHash -ne $oldHash){
 # Cleanup
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 
-if($fail){ Write-Error "MERKLE EDGE-CASE TESTS FAILED"; exit 1 }
+if($fail){ Write-Host "MERKLE EDGE-CASE TESTS FAILED" -ForegroundColor Red; exit 1 }
 Write-Host "MERKLE EDGE-CASE TESTS PASS" -ForegroundColor Green
 exit 0
