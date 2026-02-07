@@ -14,15 +14,16 @@ function Fail($id,$m){ Write-Host "FAIL [$id]: $m" -ForegroundColor Red; $script
 function Gap($id,$m){ Write-Host "KNOWN-GAP [$id]: $m" -ForegroundColor Yellow; $script:gap=$true }
 
 # Helper: run audit.ps1 with args, capture output and exit code
+# Uses wrapper script with *>&1 to merge all PS streams (including Write-Host)
 function Run-Audit([string[]]$Args){
     $uid = [guid]::NewGuid().ToString('N').Substring(0,8)
     $wrapperPath = Join-Path $tmpDir "audit-wrap-$uid.ps1"
     $outFile = Join-Path $tmpDir "audit-out-$uid.txt"
     $errFile = Join-Path $tmpDir "audit-err-$uid.txt"
-    $argStr = ($Args | ForEach-Object { "'$_'" }) -join ','
+    $argParts = ($Args | ForEach-Object { "`"$_`"" }) -join ' '
     @"
 `$PSNativeCommandUseErrorActionPreference = `$false
-& '$auditScript' $($Args | ForEach-Object { "`"$_`"" } | ForEach-Object { "$_ " }) *>&1
+& '$auditScript' $argParts *>&1
 exit `$LASTEXITCODE
 "@ | Set-Content -Encoding UTF8 $wrapperPath
     $proc = Start-Process -FilePath pwsh `
@@ -209,7 +210,7 @@ Write-Host "--- Scenario 7: Verify uten audit ---" -ForegroundColor Cyan
 $outBackup = Join-Path $repoRoot "output_backup_c8_$([guid]::NewGuid().ToString('N').Substring(0,8))"
 $needsRestore = $false
 if(Test-Path $outDir){
-    Rename-Item $outDir $outBackup
+    Move-Item -Path $outDir -Destination $outBackup -Force
     $needsRestore = $true
 }
 
@@ -232,7 +233,7 @@ try {
     # Always restore output dir
     if($needsRestore -and (Test-Path $outBackup)){
         if(Test-Path $outDir){ Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
-        Rename-Item $outBackup $outDir
+        Move-Item -Path $outBackup -Destination $outDir -Force
     }
 }
 

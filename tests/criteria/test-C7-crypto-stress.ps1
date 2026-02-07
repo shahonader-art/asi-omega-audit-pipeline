@@ -18,7 +18,7 @@ function Fail($id,$m){ Write-Host "FAIL [$id]: $m" -ForegroundColor Red; $script
 # A leaf node MUST NOT be confusable with an internal node.
 # This prevents second-preimage attacks on the Merkle tree.
 # =====================================================================
-$testInputs = @("a" * 64, "b" * 64, "0" * 64, "f" * 64, "deadbeef" * 8)
+$testInputs = @(("a" * 64), ("b" * 64), ("0" * 64), ("f" * 64), ("deadbeef" * 8))
 $cs1Pass = $true
 foreach($input in $testInputs){
     $leaf = Get-MerkleLeafHash $input
@@ -34,7 +34,7 @@ if($cs1Pass){ Pass "CS1" "Domain separation holds for all test inputs (leaf hash
 # CS2: Bit-flip sensitivity — changing 1 bit in 1 leaf changes the root
 # Tests avalanche property: a single-bit change must propagate to root.
 # =====================================================================
-$baseLeaves = @("aa" * 32, "bb" * 32, "cc" * 32, "dd" * 32)
+$baseLeaves = @(("aa" * 32), ("bb" * 32), ("cc" * 32), ("dd" * 32))
 $baseRoot = Build-MerkleTree $baseLeaves
 
 # Flip one hex char in the first leaf (a→b)
@@ -63,8 +63,8 @@ if($baseRoot -ne $flippedLastRoot){
 # CS3: Order sensitivity — swapping leaves must change the root
 # The Merkle tree MUST be order-dependent for forensic integrity.
 # =====================================================================
-$ordered = @("aa" * 32, "bb" * 32, "cc" * 32)
-$swapped = @("bb" * 32, "aa" * 32, "cc" * 32)
+$ordered = @(("aa" * 32), ("bb" * 32), ("cc" * 32))
+$swapped = @(("bb" * 32), ("aa" * 32), ("cc" * 32))
 
 $orderedRoot = Build-MerkleTree $ordered
 $swappedRoot = Build-MerkleTree $swapped
@@ -76,7 +76,7 @@ if($orderedRoot -ne $swappedRoot){
 }
 
 # Test with more permutations
-$perm1 = @("aa" * 32, "cc" * 32, "bb" * 32)
+$perm1 = @(("aa" * 32), ("cc" * 32), ("bb" * 32))
 $perm1Root = Build-MerkleTree $perm1
 if($orderedRoot -ne $perm1Root -and $swappedRoot -ne $perm1Root){
     Pass "CS3" "Third permutation also produces unique root"
@@ -88,7 +88,7 @@ if($orderedRoot -ne $perm1Root -and $swappedRoot -ne $perm1Root){
 # CS4: Determinism — same inputs always produce same root
 # Run Build-MerkleTree 10 times with identical input.
 # =====================================================================
-$detLeaves = @("1111" * 16, "2222" * 16, "3333" * 16, "4444" * 16, "5555" * 16)
+$detLeaves = @(("1111" * 16), ("2222" * 16), ("3333" * 16), ("4444" * 16), ("5555" * 16))
 $roots = @()
 for($i = 0; $i -lt 10; $i++){
     $roots += Build-MerkleTree $detLeaves

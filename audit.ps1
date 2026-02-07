@@ -19,6 +19,7 @@ param(
 #   pwsh audit.ps1 -Help               Vis detaljert hjelp
 
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # ─────────────────────────────────────────────────────
