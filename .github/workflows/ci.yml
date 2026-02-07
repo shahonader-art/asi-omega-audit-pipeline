@@ -1,38 +1,18 @@
 name: CI
 on: [push, pull_request]
 jobs:
-  selftest:
+  test:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run demo
-        run: pwsh -NoProfile -File src/run_demo.ps1 -Out output
-      - name: Run tests
-        run: pwsh -NoProfile -File tests/selftest.ps1
-      - name: Merkle root
-        run: pwsh -NoProfile -File tools/Merkle.ps1 -CsvPath output/manifest.csv
-      - name: DoD report
-        run: pwsh -NoProfile -File tools/DoD.ps1 -Out output/DoD
-      - name: Test OTS-Stub
-        run: pwsh -NoProfile -File tests/test-ots-stub.ps1
-      - name: Test Sign-DoD
-        run: pwsh -NoProfile -File tests/test-sign-dod.ps1
-      - name: Test meta_gen
-        run: pwsh -NoProfile -File tests/test-meta-gen.ps1
-      - name: Test Merkle edge cases
-        run: pwsh -NoProfile -File tests/test-merkle-edge-cases.ps1
-      - name: Test error paths
-        run: pwsh -NoProfile -File tests/test-error-paths.ps1
-      - name: Test determinism
-        run: pwsh -NoProfile -File tests/test-determinism.ps1
-      - name: Test OTS-Stamp
-        run: pwsh -NoProfile -File tests/test-ots-stamp.ps1
-      - name: Test Sign-Audit
-        run: pwsh -NoProfile -File tests/test-sign-audit.ps1
-      - name: Test GUI launch
-        run: pwsh -NoProfile -File tests/test-gui-launch.ps1
-      - name: Publish artefacts
+
+      - name: Run full test suite
+        run: pwsh -NoProfile -File test.ps1
+        continue-on-error: false
+
+      - name: Publish artifacts
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: audit-artifacts
           path: |

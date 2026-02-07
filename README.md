@@ -1,6 +1,6 @@
 <p align="center">
   <strong>ASI-Omega Audit Pipeline</strong><br>
-  <em>Kryptografisk bevis for at filene dine er ekte og uendret.</em>
+  <em>Portable forensic notary — cryptographic proof that your files are authentic and unchanged.</em>
 </p>
 
 <p align="center">
@@ -10,35 +10,66 @@
   <a href="https://github.com/shahonader-art/asi-omega-audit-pipeline/actions/workflows/verify.yml">
     <img src="https://github.com/shahonader-art/asi-omega-audit-pipeline/actions/workflows/verify.yml/badge.svg" alt="Verify">
   </a>
+  <img src="https://img.shields.io/badge/PowerShell-7%2B-blue" alt="PowerShell 7+">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
 </p>
 
 ---
 
-## Hva er dette?
+## The only tool that combines all three
 
-ASI-Omega er et verktoy som **beviser at filer ikke er endret**.
+| Capability | Tripwire | CrowdStrike | Wazuh | Windows SFC | **ASI-Omega** |
+|:--|:--:|:--:|:--:|:--:|:--:|
+| SHA-256 file hashing | Yes | Yes | Yes | Internal | **Yes** |
+| RFC 6962 Merkle tree | - | - | - | - | **Yes** |
+| GPG digital signatures | - | - | - | - | **Yes** |
+| Blockchain timestamping (OTS) | - | - | - | - | **Yes** |
+| Self-contained evidence package | - | - | - | - | **Yes** |
+| No infrastructure required | - | - | - | Yes | **Yes** |
+| Free | - | - | Yes | Yes | **Yes** |
 
-Du peker det mot en mappe. Det beregner et unikt fingeravtrykk for hver fil, kombinerer dem til ett tall (en Merkle-rot), og genererer en rapport. Endres en eneste byte i en eneste fil — endres hele beviset.
-
-```
-Dine filer  →  SHA-256 per fil  →  Merkle-rot  →  Rapport
-```
-
-**Ingen kan forfalske dette. Heller ikke deg selv.**
+> **One script. Zero dependencies. Court-admissible proof.**
 
 ---
 
-## Installasjon
+## What does it do?
 
-### Alternativ 1: En-kommando installasjon (anbefalt)
+Point it at a folder. It calculates a unique fingerprint for every file, combines them into a single number (a Merkle root), and generates a report. Change a single byte in a single file — the entire proof changes.
+
+```
+Your files  →  SHA-256 per file  →  Merkle tree  →  Report + Signature + Timestamp
+```
+
+**No one can forge this. Not even you.**
+
+---
+
+## Why not just use Windows SFC?
+
+Windows SFC is a **repair tool** — it checks Windows system files and fixes them.
+
+ASI-Omega is a **forensic proof tool** — it proves to a third party that specific files existed in a specific state at a specific time.
+
+| | Windows SFC | ASI-Omega |
+|--|--|--|
+| **Purpose** | Repair Windows files | Prove files are unchanged |
+| **Scope** | Windows system files only | Any files you choose |
+| **Proof** | None — repairs only | Cryptographic evidence chain |
+| **Timestamp** | None | Bitcoin blockchain (OTS) |
+| **Signature** | None | GPG |
+| **In court** | Worthless | Legally defensible |
+
+---
+
+## Installation
+
+### Option 1: One-command install (recommended)
 
 ```powershell
 irm https://raw.githubusercontent.com/shahonader-art/asi-omega-audit-pipeline/main/install.ps1 | iex
 ```
 
-Dette laster ned prosjektet, lager en snarvei paa skrivebordet, og setter opp alt automatisk.
-
-### Alternativ 2: Manuell installasjon
+### Option 2: Manual
 
 ```powershell
 git clone https://github.com/shahonader-art/asi-omega-audit-pipeline.git
@@ -46,7 +77,7 @@ cd asi-omega-audit-pipeline
 pwsh audit.ps1 -Help
 ```
 
-### Alternativ 3: Bygg som .exe
+### Option 3: Build as .exe
 
 ```powershell
 git clone https://github.com/shahonader-art/asi-omega-audit-pipeline.git
@@ -54,171 +85,206 @@ cd asi-omega-audit-pipeline
 pwsh build-exe.ps1
 ```
 
-Ferdig! Filene ligger i `dist/`-mappen, klar til aa distribuere.
+### Requirements
 
-### Krav
-
-- [PowerShell 7+](https://github.com/PowerShell/PowerShell/releases) (gratis, Windows/Mac/Linux)
-- [Gpg4win](https://gpg4win.org) (valgfritt, for digital signering)
+- [PowerShell 7+](https://github.com/PowerShell/PowerShell/releases) (free, Windows/Mac/Linux)
+- [Gpg4win](https://gpg4win.org) (optional, for digital signatures)
 
 ---
 
-## Bruk
+## Usage
 
-### Grafisk (GUI)
+### GUI
 
-Dobbeltklikk **ASI-Omega Audit** paa skrivebordet, eller:
+Double-click **ASI-Omega Audit** on your desktop, or:
 
 ```powershell
 pwsh audit-gui.ps1
 ```
 
-### Terminal
+### CLI
 
 ```powershell
-# Auditer en mappe
-pwsh audit.ps1 -Path "C:\Mine\Dokumenter"
+# Audit a folder
+pwsh audit.ps1 -Path "C:\My\Documents"
 
-# Verifiser at filer er uendret
+# Verify files are unchanged
 pwsh audit.ps1 -Verify
 
-# Full audit med signering og tidsstempel
+# Full audit with signing and timestamping
 pwsh audit.ps1 -Full
 
-# Vis alle kommandoer
+# Show all commands
 pwsh audit.ps1 -Help
 ```
 
-### Kommandooversikt
+### Commands
 
-| Kommando | Beskrivelse |
-|----------|-------------|
-| `pwsh audit.ps1` | Auditer standardmappen |
-| `pwsh audit.ps1 -Path <mappe>` | Auditer en vilkaarlig mappe |
-| `pwsh audit.ps1 -Verify` | Kontroller at filer er uendret |
-| `pwsh audit.ps1 -Sign` | Auditer + GPG-signering |
-| `pwsh audit.ps1 -Timestamp` | Auditer + uavhengig tidsstempel |
-| `pwsh audit.ps1 -Full` | Alt: audit + signering + tidsstempel |
-
----
-
-## Hva faar du?
-
-Etter en audit finner du disse filene i `output/`:
-
-| Fil | Beskrivelse |
-|-----|-------------|
-| `rapport.txt` | Lesbar rapport med alle detaljer |
-| `manifest.csv` | SHA-256 fingeravtrykk per fil |
-| `merkle_root.txt` | Ett kombinert fingeravtrykk for alt |
-| `DoD/DoD.json` | Maskinlesbar rapport (JSON) |
-| `*.asc` | GPG-signaturer (med `-Sign`) |
-| `ots_receipt.txt` | Tidsstempel-kvittering (med `-Timestamp`) |
+| Command | Description |
+|---------|-------------|
+| `pwsh audit.ps1` | Audit the default folder |
+| `pwsh audit.ps1 -Path <folder>` | Audit any folder |
+| `pwsh audit.ps1 -Verify` | Verify files are unchanged |
+| `pwsh audit.ps1 -Sign` | Audit + GPG signing |
+| `pwsh audit.ps1 -Timestamp` | Audit + independent timestamp |
+| `pwsh audit.ps1 -Full` | Everything: audit + signing + timestamp |
 
 ---
 
-## Hvem er dette for?
+## Output
 
-### Advokater og jurister
-> *"Klienten leverte dokumenter 15. januar. Vi trenger bevis for at de ikke er endret."*
-
-Kjoer `audit.ps1 -Full` paa dokumentene. Rapporten er et kryptografisk bevis som kan legges ved saken.
-
-### Revisorer og oekonomer
-> *"Regnskapet maa vaere identisk med det som ble levert til Skatteetaten."*
-
-Auditer ved levering. Verifiser naar som helst etterpaa med `audit.ps1 -Verify`.
-
-### IT og utviklere
-> *"Kunden hevder programvaren vi leverte hadde en feil. Vi maa bevise hva vi faktisk leverte."*
-
-Auditer `release/`-mappen foer levering. Lagre `output/` sammen med leveransen.
-
-### Forskere
-> *"Fagfellen krever bevis for at datasettet ikke er manipulert etter analyse."*
-
-Auditer datasettet etter analyse. Legg ved rapporten til publikasjonen.
+| File | Description |
+|------|-------------|
+| `rapport.txt` | Human-readable report |
+| `manifest.csv` | SHA-256 fingerprint per file |
+| `merkle_root.txt` | Single combined fingerprint |
+| `DoD/DoD.json` | Machine-readable report (JSON) |
+| `*.asc` | GPG signatures (with `-Sign`) |
+| `ots_receipt.txt` | Timestamp receipt (with `-Timestamp`) |
 
 ---
 
-## Slik fungerer det
+## Use cases
+
+### Lawyers
+> *"The client delivered documents on January 15th. We need proof they haven't been modified."*
+
+Run `audit.ps1 -Full` on the documents. The report is cryptographic evidence.
+
+### Auditors
+> *"The accounts must be identical to what was submitted to the tax authority."*
+
+Audit at delivery. Verify anytime with `audit.ps1 -Verify`.
+
+### IT / Developers
+> *"The customer claims the software we delivered had a bug. We need to prove what we actually shipped."*
+
+Audit the `release/` folder before delivery. Store `output/` with the release.
+
+### Researchers
+> *"The peer reviewer requires proof the dataset wasn't manipulated after analysis."*
+
+Audit the dataset. Attach the report to the publication.
+
+### AI / ML teams
+> *"We need to prove our training data and model weights are authentic and unmodified."*
+
+Audit data and models. The blockchain-anchored timestamp proves provenance.
+
+---
+
+## How it works
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌────────────┐     ┌───────────┐
-│  Dine filer  │ ──→ │  SHA-256 per  │ ──→ │ Merkle-tre │ ──→ │  Rapport  │
-│              │     │  fil          │     │            │     │           │
-└─────────────┘     └──────────────┘     └────────────┘     └───────────┘
+│  Your files  │ ──→ │  SHA-256 per  │ ──→ │ Merkle tree │ ──→ │  Report   │
+│              │     │  file         │     │ (RFC 6962)  │     │ + Sign    │
+└─────────────┘     └──────────────┘     └────────────┘     │ + OTS     │
+                                                             └───────────┘
 ```
 
-1. **Scanner** alle filer og beregner SHA-256 fingeravtrykk (NIST FIPS 180-4)
-2. **Kombinerer** fingeravtrykkene i et Merkle-tre til en rot
-3. **Tester** at alle beregninger er korrekte (selvtest)
-4. **Genererer** rapport med tidsstempel og systeminfo
-5. **Signerer** (valgfritt) med GPG for personlig garanti
-6. **Tidsstempler** (valgfritt) via uavhengig tjeneste
+1. **Scans** all files and computes SHA-256 fingerprints (NIST FIPS 180-4)
+2. **Combines** fingerprints into a Merkle tree with RFC 6962 domain separation
+3. **Self-tests** to verify all computations are correct
+4. **Generates** report with timestamp and system info
+5. **Signs** (optional) with GPG for personal guarantee
+6. **Timestamps** (optional) via OpenTimestamps for blockchain anchoring
 
-### Verifisering
+### Verification
 
-Naar du kjoerer `audit.ps1 -Verify`, skjer foelgende:
+When you run `audit.ps1 -Verify`, it performs 9 checks:
 
-1. Alle filer paa disk re-hashes og sammenlignes med manifestet
-2. Merkle-roten reberegnes fra manifestet
-3. DoD-rapporten kontrolleres mot Merkle-roten
-4. NTP-drift sjekkes for aa validere tidspunkt
-
-Hvis en eneste fil er endret — faar du beskjed.
+1. All required files exist
+2. DoD.json Merkle root matches merkle_root.txt
+3. Schema version check
+4. Merkle root recomputed from manifest matches
+5. Every file on disk matches its manifest hash
+6. No unauthorized files on disk (not in manifest)
+7. GPG signatures valid (if present)
+8. Pipeline script integrity (script_hashes in DoD)
+9. NTP drift sanity check
 
 ---
 
-## Teknisk
+## Testing
 
-| Egenskap | Verdi |
+```powershell
+# Run all tests
+pwsh test.ps1
+
+# Run only specific suites
+pwsh test.ps1 -Only criteria    # C1-C8 acceptance tests
+pwsh test.ps1 -Only merkle      # Merkle tree tests
+pwsh test.ps1 -Only quick       # Golden hash selftest
+```
+
+### 8 Acceptance Criteria + 4 Utility Tests
+
+| Test | What it validates |
+|------|-------------------|
+| C1 | **Determinism** — same inputs always produce same outputs |
+| C2 | **Tamper detection** — any file change is caught |
+| C3 | **Merkle correctness** — RFC 6962 domain separation, padding |
+| C4 | **No silent failures** — every error produces non-zero exit |
+| C5 | **Timestamp trust** — time validation and OTS anchoring |
+| C6 | **End-to-end** — full pipeline chain of custody |
+| C7 | **Crypto stress** — 13 in-process tests: avalanche, collisions, scale |
+| C8 | **User workflow** — 9 real-user scenarios including tamper detection |
+
+---
+
+## Technical
+
+| Property | Value |
 |----------|-------|
-| Spraak | PowerShell 7+ |
+| Language | PowerShell 7+ |
 | Hashing | SHA-256 (NIST FIPS 180-4) |
-| Merkle-tre | Binaert tre med duplisering av siste blad |
-| Signering | GPG detached signatures (.asc) |
-| Tidsstempling | OpenTimestamps (valgfritt) |
-| NTP | Kryss-plattform (w32tm / ntpdate / sntp / chronyc) |
-| Plattform | Windows, macOS, Linux |
+| Merkle tree | RFC 6962 binary tree with domain separation |
+| Signing | GPG detached signatures (.asc) |
+| Timestamping | OpenTimestamps (Bitcoin blockchain) |
+| NTP | Cross-platform (w32tm / ntpdate / sntp / chronyc) |
+| Platform | Windows, macOS, Linux |
 | CI/CD | GitHub Actions |
-| Tester | 19 testfiler, 6 akseptansekriterier |
+| Tests | 12 test suites, 8 acceptance criteria, 50+ individual checks |
 
 ---
 
-## Prosjektstruktur
+## Project structure
 
 ```
 asi-omega-audit-pipeline/
-├── audit.ps1            Hovedkommando (CLI)
-├── audit-gui.ps1        Grafisk brukergrensesnitt
-├── install.ps1          Installasjonsskript
-├── build-exe.ps1        Bygg .exe-filer
+├── audit.ps1            Main CLI entry point
+├── audit-gui.ps1        GUI (Windows Forms)
+├── install.ps1          One-command installer
+├── build-exe.ps1        Build standalone .exe
+├── test.ps1             Test runner
+├── lib/
+│   └── crypto.ps1       Shared cryptographic library
 ├── src/
-│   └── run_demo.ps1     Generer filmanifest
+│   └── run_demo.ps1     Manifest generation
 ├── tools/
-│   ├── Merkle.ps1       Bygg Merkle-tre
-│   ├── verify.ps1       Verifisering
-│   ├── DoD.ps1          Generer DoD-rapport
-│   ├── NtpDrift.ps1     NTP-tidssjekk
-│   ├── Sign-Audit.ps1   GPG-signering
-│   └── OTS-Stamp.ps1    Uavhengig tidsstempling
-├── tests/               Testfiler
-├── docs/                Dokumentasjon og metadata
-└── sample/              Eksempelfiler for testing
+│   ├── Merkle.ps1       Merkle tree builder
+│   ├── verify.ps1       9-check verification
+│   ├── DoD.ps1          DoD report generator
+│   ├── NtpDrift.ps1     NTP time validation
+│   ├── Sign-Audit.ps1   GPG signing
+│   ├── OTS-Stamp.ps1    OpenTimestamps
+│   └── OTS-Stub.ps1     Local OTS fallback
+├── tests/               12 test suites
+├── docs/                Architecture, security, schemas
+└── sample/              Sample files for testing
 ```
 
 ---
 
-## Lisens
+## License
 
-MIT
+MIT — see [LICENSE](LICENSE)
 
-## Forfatter
+## Author
 
 **Shaho Nader** — [GitHub](https://github.com/shahonader-art)
 
-## Kontakt
+## Issues
 
-For spoersmaal eller feilmeldinger:
 [github.com/shahonader-art/asi-omega-audit-pipeline/issues](https://github.com/shahonader-art/asi-omega-audit-pipeline/issues)
