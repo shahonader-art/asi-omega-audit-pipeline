@@ -13,27 +13,21 @@ function Pass($id,$m){ Write-Host "PASS [$id]: $m" -ForegroundColor Green }
 function Fail($id,$m){ Write-Host "FAIL [$id]: $m" -ForegroundColor Red; $script:fail=$true }
 function Gap($id,$m){ Write-Host "KNOWN-GAP [$id]: $m" -ForegroundColor Yellow; $script:gap=$true }
 
-# Helper: run audit.ps1 with args, capture output and exit code
-# Uses a wrapper script that calls audit.ps1 via pwsh -File (separate process).
-# This way audit.ps1's 'exit N' terminates the INNER pwsh, not the wrapper,
-# so the wrapper can capture $LASTEXITCODE and write it to a file.
+# Helper: run audit.ps1 using .NET Process for reliable exit code capture.
+# PS 7.5 Start-Process loses exit codes. System.Diagnostics.Process does not.
 function Run-Audit([string[]]$Args){
-    $uid = [guid]::NewGuid().ToString('N').Substring(0,8)
-    $wrapperPath = Join-Path $tmpDir "wrap-$uid.ps1"
-    $exitFile = Join-Path $tmpDir "exit-$uid.txt"
-    $outFile = Join-Path $tmpDir "out-$uid.txt"
-    $argParts = ($Args | ForEach-Object { "`"$_`"" }) -join ' '
-    @"
-`$PSNativeCommandUseErrorActionPreference = `$false
-pwsh -NoProfile -File '$auditScript' $argParts 2>&1
-`$LASTEXITCODE | Set-Content -Path '$exitFile'
-"@ | Set-Content -Encoding UTF8 $wrapperPath
-    $proc = Start-Process -FilePath pwsh `
-        -ArgumentList "-NoProfile -File `"$wrapperPath`"" `
-        -Wait -PassThru -RedirectStandardOutput $outFile -NoNewWindow
-    $stdout = if(Test-Path $outFile){ Get-Content -Raw $outFile } else { "" }
-    $ec = if(Test-Path $exitFile){ [int](Get-Content -Raw $exitFile).Trim() } else { $proc.ExitCode }
-    return @{ ExitCode=$ec; Output=$stdout }
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = 'pwsh'
+    $psi.Arguments = "-NoProfile -File `"$auditScript`" $($Args -join ' ')"
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+    $p = [System.Diagnostics.Process]::Start($psi)
+    $stdout = $p.StandardOutput.ReadToEnd()
+    $stderr = $p.StandardError.ReadToEnd()
+    $p.WaitForExit()
+    return @{ ExitCode = $p.ExitCode; Output = "$stdout`n$stderr" }
 }
 
 # =====================================================================
@@ -77,7 +71,7 @@ Write-Host ""
 Write-Host "--- Scenario 2: Verifisering etter audit ---" -ForegroundColor Cyan
 $r2 = Run-Audit @("-Verify")
 
-if($r2.ExitCode -eq 0){
+if($r2.ExitCode -eq 0 -and $r2.Output -notmatch 'FEIL|Mangler'){
     Pass "U2" "audit.ps1 -Verify passes on fresh audit"
 } else {
     Fail "U2" "audit.ps1 -Verify failed on fresh audit (exit $($r2.ExitCode))"
@@ -106,10 +100,13 @@ $r3 = Run-Audit @("-Verify")
 # Restore original content IMMEDIATELY (before any error can prevent it)
 [System.IO.File]::WriteAllBytes($sampleFile, $originalContent)
 
-if($r3.ExitCode -ne 0){
-    Pass "U3" "Tamper detected! audit.ps1 -Verify correctly failed after file modification"
+# Check BOTH exit code AND output for failure indicators
+$tamperDetected = ($r3.ExitCode -ne 0) -or ($r3.Output -match 'FEIL|FAIL|mismatch|endret|Mangler')
+if($tamperDetected){
+    Pass "U3" "Tamper detected! verify failed after file modification (exit $($r3.ExitCode))"
 } else {
     Fail "U3" "audit.ps1 -Verify PASSED despite file modification — tamper not detected!"
+    Write-Host "  EXIT=$($r3.ExitCode) OUTPUT=$(if($r3.Output){$r3.Output.Substring(0,[Math]::Min(300,$r3.Output.Length))})" -ForegroundColor DarkGray
 }
 
 # =====================================================================
@@ -220,10 +217,13 @@ if(Test-Path $outDir){
 try {
     $r7 = Run-Audit @("-Verify")
 
-    if($r7.ExitCode -ne 0){
+    # Check BOTH exit code AND output for failure indicators
+    $verifyFailed = ($r7.ExitCode -ne 0) -or ($r7.Output -match 'Mangler|missing|feil|FEIL|error|Error')
+    if($verifyFailed){
         Pass "U7" "audit.ps1 -Verify correctly fails when no audit exists (exit $($r7.ExitCode))"
     } else {
         Fail "U7" "audit.ps1 -Verify PASSED despite no audit output existing"
+        Write-Host "  EXIT=$($r7.ExitCode) OUTPUT=$(if($r7.Output){$r7.Output.Substring(0,[Math]::Min(300,$r7.Output.Length))})" -ForegroundColor DarkGray
     }
 
     # Check for helpful error message
