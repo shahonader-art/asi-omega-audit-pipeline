@@ -14,11 +14,12 @@ function Fail($id,$m){ Write-Host "FAIL [$id]: $m" -ForegroundColor Red; $script
 function Gap($id,$m){ Write-Host "KNOWN-GAP [$id]: $m" -ForegroundColor Yellow; $script:gap=$true }
 
 # Helper: run audit.ps1 using .NET Process for reliable exit code capture.
-# PS 7.5 Start-Process loses exit codes. System.Diagnostics.Process does not.
+# Uses -Command (not -File) because PS 7.5 -File drops switch parameters like -Verify.
+# With -Command, switches are in PowerShell context and correctly recognized.
 function Run-Audit([string[]]$Args){
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = 'pwsh'
-    $psi.Arguments = "-NoProfile -File `"$auditScript`" $($Args -join ' ')"
+    $psi.Arguments = "-NoProfile -Command `"& '$auditScript' $($Args -join ' ')`""
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
