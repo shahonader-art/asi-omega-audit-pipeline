@@ -167,7 +167,7 @@ if($Only -eq 'all' -or $Only -eq 'errors'){
 }
 
 # ─────────────────────────────────────────────────────
-# Acceptance criteria (C1-C6)
+# Acceptance criteria (C1-C7)
 # ─────────────────────────────────────────────────────
 if($Only -eq 'all' -or $Only -eq 'criteria'){
     Write-Host "  --- Akseptansekriterier ---" -ForegroundColor Cyan
@@ -177,6 +177,7 @@ if($Only -eq 'all' -or $Only -eq 'criteria'){
     Run-TestFile "C4: Ingen stille feil"  "tests\criteria\test-C4-silent-failures.ps1"
     Run-TestFile "C5: Tidsstempel"        "tests\criteria\test-C5-timestamp.ps1"
     Run-TestFile "C6: Ende-til-ende"      "tests\criteria\test-C6-end-to-end.ps1"
+    Run-TestFile "C7: Krypto-stresstest"  "tests\criteria\test-C7-crypto-stress.ps1"
     Write-Host ""
 }
 
