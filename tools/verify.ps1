@@ -23,9 +23,15 @@ foreach($p in @($DoD,$Manifest,$MerkleRoot)){ if(-not (Test-Path $p)){ FAIL "Mis
 $rootFile = (Get-Content -Raw -Path $MerkleRoot).Trim().ToLower()
 
 # 2) Read DoD and check it points to same root
-$dod = Get-Content -Raw -Path $DoD | ConvertFrom-Json
-if(-not $dod.merkle_root){ FAIL "DoD.json missing 'merkle_root'" }
-if($dod.merkle_root.ToLower() -ne $rootFile){ FAIL "DoD.merkle_root != merkle_root.txt" } else { OK "DoD.merkle_root matches merkle_root.txt" }
+$dodRaw = Get-Content -Raw -Path $DoD
+# Use regex to extract merkle_root (avoids ConvertFrom-Json serialization issues on PS 7.5)
+$mrMatch = [regex]::Match($dodRaw, '"merkle_root"\s*:\s*"([^"]+)"')
+if(-not $mrMatch.Success){ FAIL "DoD.json missing 'merkle_root' (raw content: $($dodRaw.Substring(0, [Math]::Min(200,$dodRaw.Length))))" }
+$dodMerkleRoot = $mrMatch.Groups[1].Value.ToLower()
+if($dodMerkleRoot -ne $rootFile){ FAIL "DoD.merkle_root != merkle_root.txt" } else { OK "DoD.merkle_root matches merkle_root.txt" }
+
+# Parse DoD for remaining checks
+$dod = $dodRaw | ConvertFrom-Json
 
 # 3) Check schema version
 if($dod.schema_version){

@@ -106,7 +106,38 @@ try {
     $data.ntp_drift_seconds = $null
 }
 
-$data | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 -Path (Join-Path $Out 'DoD.json')
+# Build JSON manually to avoid ConvertTo-Json serialization issues on PS 7.5+
+$mrVal = if($data.merkle_root){ "`"$($data.merkle_root)`"" } else { "null" }
+$ntpVal = if($null -ne $data.ntp_drift_seconds){ "$($data.ntp_drift_seconds)" } else { "null" }
+$mcsvVal = if($data.artefacts.manifest_csv){ "true" } else { "false" }
+$ghVal = if($data.artefacts.golden_hashes){ "true" } else { "false" }
+
+# Build script_hashes object
+$shParts = @()
+foreach($k in ($data.script_hashes.Keys | Sort-Object)){
+    $v = $data.script_hashes[$k]
+    $shParts += "    `"$k`": `"$v`""
+}
+$shJson = if($shParts.Count -gt 0){ "{`n" + ($shParts -join ",`n") + "`n  }" } else { "{}" }
+
+@"
+{
+  "schema_version": $($data.schema_version),
+  "name": "$($data.name)",
+  "generated": "$($data.generated)",
+  "timezone": "$($data.timezone)",
+  "culture": "$($data.culture)",
+  "platform": "$($data.platform)",
+  "merkle_root": $mrVal,
+  "merkle_algorithm": "$($data.merkle_algorithm)",
+  "ntp_drift_seconds": $ntpVal,
+  "artefacts": {
+    "manifest_csv": $mcsvVal,
+    "golden_hashes": $ghVal
+  },
+  "script_hashes": $shJson
+}
+"@ | Set-Content -Encoding UTF8 -Path (Join-Path $Out 'DoD.json')
 
 # Hash all top-level files for the report
 $top = Get-ChildItem -Path $repoRoot -File

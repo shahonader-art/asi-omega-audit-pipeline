@@ -65,33 +65,36 @@ try {
     }
 } catch { }
 
-# Generate DoD.json directly with current timestamp
+# Generate DoD.json directly with current timestamp using string template
+# (avoids ConvertTo-Json/ConvertFrom-Json date serialization issues in PS 7.5)
 $dodPath = Join-Path $dodDir 'DoD.json'
-[pscustomobject]@{
-    schema_version    = 2
-    generated         = (Get-Date).ToString("o")
-    merkle_root       = $mr
-    ntp_drift_seconds = $ntpDrift
-} | ConvertTo-Json | Set-Content -Encoding UTF8 $dodPath
+$genTimestamp = (Get-Date).ToString("o")
+@"
+{"schema_version":2,"generated":"$genTimestamp","merkle_root":"$mr","ntp_drift_seconds":$ntpDrift}
+"@ | Set-Content -Encoding UTF8 $dodPath
 
 # =====================================================================
 # TS1: DoD.json must contain a valid ISO 8601 timestamp
 # =====================================================================
 if(Test-Path $dodPath){
-    $dod = Get-Content -Raw $dodPath | ConvertFrom-Json
+    # Read raw JSON content and extract generated field as string
+    # (ConvertFrom-Json in PS 7.5 auto-converts dates to DateTimeOffset which breaks roundtrip)
+    $dodRaw = Get-Content -Raw $dodPath
+    $genMatch = [regex]::Match($dodRaw, '"generated"\s*:\s*"([^"]+)"')
 
-    if($dod.generated){
+    if($genMatch.Success){
+        $genStr = $genMatch.Groups[1].Value
         try {
-            $ts = [datetime]::Parse($dod.generated)
+            $ts = [datetime]::Parse($genStr)
             $now = Get-Date
             $drift = [math]::Abs(($now - $ts).TotalSeconds)
             if($drift -lt 60){
-                Pass "TS1" "DoD.json has valid ISO 8601 timestamp: $($dod.generated) (within ${drift}s of now)"
+                Pass "TS1" "DoD.json has valid ISO 8601 timestamp: $genStr (within ${drift}s of now)"
             } else {
-                Fail "TS1" "DoD.json timestamp is ${drift}s from current time — suspicious"
+                Fail "TS1" "DoD.json timestamp is ${drift}s from current time (generated=$genStr, now=$($now.ToString('o')))"
             }
         } catch {
-            Fail "TS1" "DoD.json 'generated' field is not valid ISO 8601: $($dod.generated)"
+            Fail "TS1" "DoD.json 'generated' field is not valid ISO 8601: $genStr"
         }
     } else {
         Fail "TS1" "DoD.json missing 'generated' field"
@@ -100,14 +103,15 @@ if(Test-Path $dodPath){
     # =====================================================================
     # TS2: NTP drift must be measured (not magic value 9999)
     # =====================================================================
-    if($null -ne $dod.ntp_drift_seconds){
-        $drift = [double]$dod.ntp_drift_seconds
-        if($drift -eq 9999){
+    $ntpMatch = [regex]::Match($dodRaw, '"ntp_drift_seconds"\s*:\s*(-?\d+\.?\d*)')
+    if($ntpMatch.Success){
+        $ntpVal = [double]$ntpMatch.Groups[1].Value
+        if($ntpVal -eq 9999){
             Gap "TS2" "NTP drift is 9999 (magic failure value) — measurement failed silently"
-        } elseif([math]::Abs($drift) -lt 30){
-            Pass "TS2" "NTP drift measured: $drift seconds"
+        } elseif([math]::Abs($ntpVal) -lt 30){
+            Pass "TS2" "NTP drift measured: $ntpVal seconds"
         } else {
-            Gap "TS2" "NTP drift is $drift seconds — unusually high, possibly unreliable"
+            Gap "TS2" "NTP drift is $ntpVal seconds — unusually high, possibly unreliable"
         }
     } else {
         Fail "TS2" "DoD.json missing 'ntp_drift_seconds' field"

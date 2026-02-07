@@ -102,16 +102,22 @@ else {
 # =====================================================================
 # E4: DoD.json references correct Merkle root
 # =====================================================================
-$dod = Get-Content -Raw $dodJson | ConvertFrom-Json
+$dodRaw = Get-Content -Raw $dodJson
 $rootFromFile = (Get-Content -Raw $merkleRoot).Trim().ToLower()
 
-if($dod.merkle_root){
-    if($dod.merkle_root.ToLower() -eq $rootFromFile){
+# Extract merkle_root using regex (avoids ConvertFrom-Json issues on PS 7.5)
+$mrMatch = [regex]::Match($dodRaw, '"merkle_root"\s*:\s*"([^"]+)"')
+if($mrMatch.Success){
+    $dodMr = $mrMatch.Groups[1].Value.ToLower()
+    if($dodMr -eq $rootFromFile){
         Pass "E4" "DoD.json merkle_root matches merkle_root.txt"
     } else {
-        Fail "E4" "DoD.json merkle_root ($($dod.merkle_root)) != merkle_root.txt ($rootFromFile)"
+        Fail "E4" "DoD.json merkle_root ($dodMr) != merkle_root.txt ($rootFromFile)"
     }
 } else {
+    # Show raw DoD.json content for diagnostics
+    Write-Host "  DEBUG: Raw DoD.json (first 500 chars):" -ForegroundColor DarkGray
+    Write-Host "  $($dodRaw.Substring(0, [Math]::Min(500, $dodRaw.Length)))" -ForegroundColor DarkGray
     Fail "E4" "DoD.json has no merkle_root field"
 }
 

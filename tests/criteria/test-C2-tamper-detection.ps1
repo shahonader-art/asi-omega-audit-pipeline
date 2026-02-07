@@ -47,9 +47,11 @@ function New-Pipeline([string]$dir){
     $mr = Build-MerkleTree $leaves
     $mr | Set-Content -Encoding ASCII -Path (Join-Path $outDir 'merkle_root.txt')
 
-    # Create DoD.json
-    [pscustomobject]@{ schema_version=2; merkle_root=$mr; ntp_drift_seconds=0.001; generated=(Get-Date).ToString("o") } |
-        ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $dodDir 'DoD.json')
+    # Create DoD.json using string template (avoids ConvertTo-Json serialization issues)
+    $genTime = (Get-Date).ToString("o")
+    @"
+{"schema_version":2,"merkle_root":"$mr","ntp_drift_seconds":0.001,"generated":"$genTime"}
+"@ | Set-Content -Encoding UTF8 (Join-Path $dodDir 'DoD.json')
 
     return @{
         SampleDir = $sampleDir
@@ -141,10 +143,10 @@ $reversed | ConvertTo-Csv -NoTypeInformation | Set-Content -Encoding UTF8 $p4.Ma
 $reorderedLeaves = @(); foreach($r in $reversed){ $reorderedLeaves += $r.SHA256.ToLower() }
 $newRoot = Build-MerkleTree $reorderedLeaves
 $newRoot | Set-Content -Encoding ASCII -Path $p4.MerkleRoot
-# Update DoD to match new root
-$dod4 = Get-Content -Raw $p4.DoDJson | ConvertFrom-Json
-$dod4.merkle_root = $newRoot
-$dod4 | ConvertTo-Json | Set-Content -Encoding UTF8 $p4.DoDJson
+# Update DoD to match new root (use regex replace to avoid ConvertFrom-Json date issues)
+$dod4Raw = Get-Content -Raw $p4.DoDJson
+$dod4Raw = $dod4Raw -replace '"merkle_root"\s*:\s*"[^"]*"', "`"merkle_root`":`"$newRoot`""
+$dod4Raw | Set-Content -Encoding UTF8 $p4.DoDJson
 
 $code4 = Test-Verify $p4
 if($code4 -ne 0){
@@ -179,8 +181,10 @@ $fakeManifest | ConvertTo-Csv -NoTypeInformation | Set-Content -Encoding UTF8 $p
 $fakeLeaves = @(); foreach($f2 in $fakeManifest){ $fakeLeaves += $f2.SHA256.ToLower() }
 $fakeRoot = Build-MerkleTree $fakeLeaves
 $fakeRoot | Set-Content -Encoding ASCII -Path $p5.MerkleRoot
-[pscustomobject]@{ merkle_root=$fakeRoot; ntp_drift_seconds=0.001; generated=(Get-Date).ToString("o") } |
-    ConvertTo-Json | Set-Content -Encoding UTF8 $p5.DoDJson
+$fakeGenTime = (Get-Date).ToString("o")
+@"
+{"schema_version":2,"merkle_root":"$fakeRoot","ntp_drift_seconds":0.001,"generated":"$fakeGenTime"}
+"@ | Set-Content -Encoding UTF8 $p5.DoDJson
 
 $code5 = Test-Verify $p5
 if($code5 -ne 0){
