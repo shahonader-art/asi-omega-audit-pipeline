@@ -5,6 +5,7 @@ param([string]$CsvPath = "")
 # Output: merkle_root.txt in the same directory as the CSV.
 
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 
 # Load shared crypto library
 . (Join-Path $PSScriptRoot '..\lib\crypto.ps1')

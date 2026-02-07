@@ -1,6 +1,7 @@
 # Criterion 4: NO SILENT FAILURES
 # Every failure mode must produce a non-zero exit code and visible error output.
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "C4-$([guid]::NewGuid().ToString('N').Substring(0,8))"
 New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null

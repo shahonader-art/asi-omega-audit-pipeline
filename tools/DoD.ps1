@@ -4,6 +4,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Prevent PS 7.4+ from promoting native command non-zero exits to terminating errors
+$PSNativeCommandUseErrorActionPreference = $false
 
 # Load shared crypto library
 . (Join-Path $PSScriptRoot '..\lib\crypto.ps1')

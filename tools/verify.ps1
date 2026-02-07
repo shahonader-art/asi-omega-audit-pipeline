@@ -5,6 +5,8 @@ param(
 )
 
 $ErrorActionPreference='Stop'
+# Prevent PS 7.4+ from promoting native command non-zero exits to terminating errors
+$PSNativeCommandUseErrorActionPreference = $false
 
 # Load shared crypto library
 . (Join-Path $PSScriptRoot '..\lib\crypto.ps1')
@@ -147,7 +149,7 @@ if($signaturesExist){
 # 8) Script integrity check (if DoD includes script hashes)
 if($dod.script_hashes){
     $scriptFail = $false
-    $repoRootForScripts = if($repoRoot){ $repoRoot } else { Split-Path -Parent (Split-Path -Parent (Resolve-Path $DoD)) }
+    $repoRootForScripts = if($repoRoot){ $repoRoot } else { Resolve-Path (Join-Path $PSScriptRoot '..') }
     foreach($prop in $dod.script_hashes.PSObject.Properties){
         $scriptPath = Join-Path $repoRootForScripts $prop.Name
         if(-not (Test-Path $scriptPath)){

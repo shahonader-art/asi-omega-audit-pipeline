@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $merkleScript = Join-Path $repoRoot 'tools\Merkle.ps1'
 $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "merkle-test-$([guid]::NewGuid().ToString('N').Substring(0,8))"

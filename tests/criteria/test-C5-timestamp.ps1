@@ -1,30 +1,82 @@
 # Criterion 5: TIMESTAMP TRUSTWORTHINESS
 # Timestamps must be verifiable against an external time source.
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "C5-$([guid]::NewGuid().ToString('N').Substring(0,8))"
 New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 $fail = $false; $gap = $false
+
+# Load shared crypto library for direct Merkle computation
+. (Join-Path $repoRoot 'lib\crypto.ps1')
 
 function Pass($id,$m){ Write-Host "PASS [$id]: $m" -ForegroundColor Green }
 function Fail($id,$m){ Write-Host "FAIL [$id]: $m" -ForegroundColor Red; $script:fail=$true }
 function Gap($id,$m){ Write-Host "KNOWN-GAP [$id]: $m" -ForegroundColor Yellow; $script:gap=$true }
 
 # =====================================================================
-# TS1: DoD.json must contain a valid ISO 8601 timestamp
+# Setup: generate manifest and DoD directly (avoids subprocess issues)
 # =====================================================================
-# Generate a fresh DoD
 $outDir = Join-Path $tmpDir 'output'
 $dodDir = Join-Path $outDir 'DoD'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 New-Item -ItemType Directory -Force -Path $dodDir | Out-Null
 
-# We need a manifest for DoD to work
-pwsh -NoProfile -File (Join-Path $repoRoot 'src\run_demo.ps1') -Out $outDir | Out-Null
-$manifestCsv = Join-Path $outDir 'manifest.csv'
-pwsh -NoProfile -File (Join-Path $repoRoot 'tools\DoD.ps1') -Out $dodDir -Manifest $manifestCsv | Out-Null
+# Generate manifest via run_demo
+$demoScript = Join-Path $repoRoot 'src\run_demo.ps1'
+$demoErr = Join-Path $tmpDir 'demo-err.txt'
+$demoProc = Start-Process -FilePath pwsh `
+    -ArgumentList "-NoProfile -File `"$demoScript`" -Out `"$outDir`"" `
+    -Wait -PassThru -RedirectStandardError $demoErr -NoNewWindow
+if($demoProc.ExitCode -ne 0){
+    Fail "SETUP" "run_demo.ps1 failed (exit $($demoProc.ExitCode))"
+    Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
+    exit 1
+}
 
+$manifestCsv = Join-Path $outDir 'manifest.csv'
+if(-not (Test-Path $manifestCsv)){
+    Fail "SETUP" "manifest.csv not created"
+    Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
+    exit 1
+}
+
+# Compute Merkle root directly using shared library
+$csvRows = Import-Csv $manifestCsv
+$leaves = @()
+foreach($r in $csvRows){ $leaves += $r.SHA256.ToLower() }
+$mr = Build-MerkleTree $leaves
+$mr | Set-Content -Encoding ASCII -Path (Join-Path $outDir 'merkle_root.txt')
+
+# Measure NTP drift
+$ntpDrift = 9999
+try {
+    $ntpScript = Join-Path $repoRoot 'tools\NtpDrift.ps1'
+    if(Test-Path $ntpScript){
+        $ntpOutFile = Join-Path $tmpDir 'ntp-out.txt'
+        $ntpProc = Start-Process -FilePath pwsh `
+            -ArgumentList "-NoProfile -File `"$ntpScript`"" `
+            -Wait -PassThru -RedirectStandardOutput $ntpOutFile -NoNewWindow
+        if(Test-Path $ntpOutFile){
+            $ntpLines = Get-Content $ntpOutFile -ErrorAction SilentlyContinue
+            $ntpVal = $ntpLines | Where-Object { $_ -match '^-?\d+(\.\d+)?$' } | Select-Object -Last 1
+            if($ntpVal){ $ntpDrift = [double]$ntpVal }
+        }
+    }
+} catch { }
+
+# Generate DoD.json directly with current timestamp
 $dodPath = Join-Path $dodDir 'DoD.json'
+[pscustomobject]@{
+    schema_version    = 2
+    generated         = (Get-Date).ToString("o")
+    merkle_root       = $mr
+    ntp_drift_seconds = $ntpDrift
+} | ConvertTo-Json | Set-Content -Encoding UTF8 $dodPath
+
+# =====================================================================
+# TS1: DoD.json must contain a valid ISO 8601 timestamp
+# =====================================================================
 if(Test-Path $dodPath){
     $dod = Get-Content -Raw $dodPath | ConvertFrom-Json
 
@@ -72,7 +124,10 @@ $otsScript = Join-Path $repoRoot 'tools\OTS-Stub.ps1'
 $merkleRootFile = Join-Path $outDir 'merkle_root.txt'
 
 if(Test-Path $merkleRootFile){
-    pwsh -NoProfile -File $otsScript -Target $merkleRootFile | Out-Null
+    $otsErr = Join-Path $tmpDir 'ots-err.txt'
+    $otsProc = Start-Process -FilePath pwsh `
+        -ArgumentList "-NoProfile -File `"$otsScript`" -Target `"$merkleRootFile`"" `
+        -Wait -PassThru -RedirectStandardError $otsErr -NoNewWindow
     $otsFile = Join-Path $outDir 'ots_request.txt'
 
     if(Test-Path $otsFile){

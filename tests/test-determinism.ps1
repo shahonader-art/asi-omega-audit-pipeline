@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "det-test-$([guid]::NewGuid().ToString('N').Substring(0,8))"
 $fail = $false

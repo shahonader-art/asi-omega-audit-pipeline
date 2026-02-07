@@ -1,6 +1,7 @@
 # Criterion 2: TAMPER DETECTION
 # Any modification to source files, manifest, or Merkle root MUST be detected.
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $verifyScript = Join-Path $repoRoot 'tools\verify.ps1'
 $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "C2-$([guid]::NewGuid().ToString('N').Substring(0,8))"
@@ -47,7 +48,7 @@ function New-Pipeline([string]$dir){
     $mr | Set-Content -Encoding ASCII -Path (Join-Path $outDir 'merkle_root.txt')
 
     # Create DoD.json
-    [pscustomobject]@{ merkle_root=$mr; ntp_drift_seconds=0.001; generated=(Get-Date).ToString("o") } |
+    [pscustomobject]@{ schema_version=2; merkle_root=$mr; ntp_drift_seconds=0.001; generated=(Get-Date).ToString("o") } |
         ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $dodDir 'DoD.json')
 
     return @{
@@ -60,12 +61,27 @@ function New-Pipeline([string]$dir){
 }
 
 # Helper: run verify and return exit code
+# Uses a wrapper script with *>&1 to capture ALL output streams (including Write-Host)
 function Test-Verify($p){
-    $errFile = Join-Path $tmpDir "verr-$([guid]::NewGuid().ToString('N').Substring(0,8)).txt"
-    $outFile = Join-Path $tmpDir "vout-$([guid]::NewGuid().ToString('N').Substring(0,8)).txt"
+    $uid = [guid]::NewGuid().ToString('N').Substring(0,8)
+    $wrapperPath = Join-Path $tmpDir "vwrap-$uid.ps1"
+    $outFile = Join-Path $tmpDir "vout-$uid.txt"
+    $errFile = Join-Path $tmpDir "verr-$uid.txt"
+    # Wrapper merges all PS streams (including info/Write-Host stream 6) into stdout
+    @"
+`$PSNativeCommandUseErrorActionPreference = `$false
+& '$verifyScript' -DoD '$($p.DoDJson)' -Manifest '$($p.Manifest)' -MerkleRoot '$($p.MerkleRoot)' *>&1
+exit `$LASTEXITCODE
+"@ | Set-Content -Encoding UTF8 $wrapperPath
     $proc = Start-Process -FilePath pwsh `
-        -ArgumentList "-NoProfile -File `"$verifyScript`" -DoD `"$($p.DoDJson)`" -Manifest `"$($p.Manifest)`" -MerkleRoot `"$($p.MerkleRoot)`"" `
-        -Wait -PassThru -RedirectStandardError $errFile -RedirectStandardOutput $outFile -NoNewWindow
+        -ArgumentList "-NoProfile -File `"$wrapperPath`"" `
+        -Wait -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile -NoNewWindow
+    if($proc.ExitCode -ne 0 -and (Test-Path $outFile)){
+        Write-Host "  --- verify.ps1 output (exit $($proc.ExitCode)) ---" -ForegroundColor DarkGray
+        Get-Content $outFile -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  VERIFY> $_" -ForegroundColor DarkGray
+        }
+    }
     return $proc.ExitCode
 }
 

@@ -1,4 +1,5 @@
 $ErrorActionPreference='Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $goldenPath = Join-Path $repoRoot 'docs\golden-hashes.json'
 $manifestCsv = Join-Path $repoRoot 'output\manifest.csv'

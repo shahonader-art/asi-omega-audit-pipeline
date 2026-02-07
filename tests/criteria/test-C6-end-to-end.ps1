@@ -1,6 +1,7 @@
 # Criterion 6: END-TO-END CHAIN OF CUSTODY
 # The full pipeline must produce a verifiable, complete evidence chain.
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "C6-$([guid]::NewGuid().ToString('N').Substring(0,8))"
 New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
@@ -73,16 +74,29 @@ $dodJson = Join-Path $dodDir 'DoD.json'
 $manifest = Join-Path $outDir 'manifest.csv'
 $merkleRoot = Join-Path $outDir 'merkle_root.txt'
 
-$errFile = Join-Path $tmpDir "e3-err.txt"
+# Use wrapper script with *>&1 to capture all output streams (including Write-Host)
+$wrapperPath = Join-Path $tmpDir "e3-wrapper.ps1"
 $outVerify = Join-Path $tmpDir "e3-out.txt"
+$errFile = Join-Path $tmpDir "e3-err.txt"
+@"
+`$PSNativeCommandUseErrorActionPreference = `$false
+& '$verifyScript' -DoD '$dodJson' -Manifest '$manifest' -MerkleRoot '$merkleRoot' *>&1
+exit `$LASTEXITCODE
+"@ | Set-Content -Encoding UTF8 $wrapperPath
 $proc = Start-Process -FilePath pwsh `
-    -ArgumentList "-NoProfile -File `"$verifyScript`" -DoD `"$dodJson`" -Manifest `"$manifest`" -MerkleRoot `"$merkleRoot`"" `
-    -Wait -PassThru -RedirectStandardError $errFile -RedirectStandardOutput $outVerify -NoNewWindow
+    -ArgumentList "-NoProfile -File `"$wrapperPath`"" `
+    -Wait -PassThru -RedirectStandardOutput $outVerify -RedirectStandardError $errFile -NoNewWindow
 
 if($proc.ExitCode -eq 0){ Pass "E3" "verify.ps1 passes on fresh pipeline output" }
 else {
-    $stderr = if(Test-Path $errFile){ Get-Content -Raw $errFile } else { "" }
-    Fail "E3" "verify.ps1 failed on fresh output (exit $($proc.ExitCode)): $stderr"
+    # Show diagnostic output from verify.ps1
+    if(Test-Path $outVerify){
+        Write-Host "  --- verify.ps1 output (exit $($proc.ExitCode)) ---" -ForegroundColor DarkGray
+        Get-Content $outVerify -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  VERIFY> $_" -ForegroundColor DarkGray
+        }
+    }
+    Fail "E3" "verify.ps1 failed on fresh output (exit $($proc.ExitCode))"
 }
 
 # =====================================================================

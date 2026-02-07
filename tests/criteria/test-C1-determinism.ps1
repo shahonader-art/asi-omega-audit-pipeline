@@ -1,6 +1,7 @@
 # Criterion 1: DETERMINISM
 # Same inputs MUST produce byte-identical outputs, every time.
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $demoScript = Join-Path $repoRoot 'src\run_demo.ps1'
 $merkleScript = Join-Path $repoRoot 'tools\Merkle.ps1'

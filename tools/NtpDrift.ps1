@@ -1,5 +1,7 @@
 param([string]$Server='time.windows.com',[int]$Samples=3)
 $ErrorActionPreference = 'Stop'
+# Prevent PS 7.4+ from promoting native command non-zero exits to terminating errors
+$PSNativeCommandUseErrorActionPreference = $false
 
 # Cross-platform NTP drift measurement
 # Returns average drift in seconds, or writes a warning and returns $null
