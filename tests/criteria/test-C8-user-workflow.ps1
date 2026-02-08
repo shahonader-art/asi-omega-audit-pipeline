@@ -13,13 +13,16 @@ function Pass($id,$m){ Write-Host "PASS [$id]: $m" -ForegroundColor Green }
 function Fail($id,$m){ Write-Host "FAIL [$id]: $m" -ForegroundColor Red; $script:fail=$true }
 function Gap($id,$m){ Write-Host "KNOWN-GAP [$id]: $m" -ForegroundColor Yellow; $script:gap=$true }
 
-# Helper: run audit.ps1 using .NET Process for reliable exit code capture.
-# Uses -Command (not -File) because PS 7.5 -File drops switch parameters like -Verify.
-# With -Command, switches are in PowerShell context and correctly recognized.
+# Helper: run audit.ps1 using .NET Process + EncodedCommand.
+# PS 7.5 drops switch params with -File and -Command due to quoting bugs.
+# EncodedCommand Base64-encodes the entire script, bypassing all parsing.
 function Run-Audit([string[]]$Args){
+    $script = "& '$auditScript' $($Args -join ' ')"
+    $bytes = [System.Text.Encoding]::Unicode.GetBytes($script)
+    $encoded = [Convert]::ToBase64String($bytes)
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = 'pwsh'
-    $psi.Arguments = "-NoProfile -Command `"& '$auditScript' $($Args -join ' ')`""
+    $psi.Arguments = "-NoProfile -EncodedCommand $encoded"
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
