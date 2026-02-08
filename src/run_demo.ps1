@@ -14,7 +14,8 @@ if(-not (Test-Path $targetRoot)){
   exit 2
 }
 
-$files = Get-ChildItem -Path $targetRoot -Recurse -File
+# Sort explicitly by relative path for deterministic manifest ordering across platforms
+$files = Get-ChildItem -Path $targetRoot -Recurse -File | Sort-Object { $_.FullName.Replace('\','/') }
 
 $manifest = @()
 foreach($f in $files){

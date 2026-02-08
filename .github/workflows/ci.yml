@@ -1,25 +1,21 @@
 name: CI
 on: [push, pull_request]
 jobs:
-  selftest:
+  test:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run demo
-        run: pwsh -NoProfile -File src/run_demo.ps1 -Out output
-      - name: Run tests
-        run: pwsh -NoProfile -File tests/selftest.ps1
 
+      - name: Run full test suite
+        run: pwsh -NoProfile -File test.ps1
+        continue-on-error: false
 
-- name: Merkle root
-  run: pwsh -NoProfile -File tools/Merkle.ps1 -CsvPath output/manifest.csv
-- name: DoD report
-  run: pwsh -NoProfile -File tools/DoD.ps1 -Out output/DoD
-- name: Publish artefacts
-  uses: actions/upload-artifact@v4
-  with:
-    name: audit-artifacts
-    path: |
-      output/manifest.csv
-      output/merkle_root.txt
-      output/DoD/**
+      - name: Publish artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-artifacts
+          path: |
+            output/manifest.csv
+            output/merkle_root.txt
+            output/DoD/**
