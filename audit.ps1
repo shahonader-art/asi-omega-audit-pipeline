@@ -114,6 +114,15 @@ Write-Host ""
 $outDir = Join-Path $root 'output'
 $dodDir = Join-Path $outDir 'DoD'
 
+# Restore sample/ from backup if previous -Path run left one
+$sampleDir = Join-Path $root 'sample'
+$existingBackup = Get-ChildItem -Path $root -Filter "sample_backup_*" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+if($existingBackup -and (-not $Path -or $Path -eq "")){
+    if(Test-Path $sampleDir){ Remove-Item -Recurse -Force $sampleDir -ErrorAction SilentlyContinue }
+    Rename-Item $existingBackup.FullName $sampleDir
+    Write-Host "  Originale sample-filer gjenopprettet." -ForegroundColor Gray
+}
+
 # Step 1: Generate manifest
 Write-Host "  [1/4] Scanner filer og beregner fingeravtrykk..." -ForegroundColor White
 if($Path -and $Path -ne ""){
@@ -125,7 +134,10 @@ if($Path -and $Path -ne ""){
     $sampleDir = Join-Path $root 'sample'
     # Back up existing sample if needed
     $backupDir = $null
-    if(Test-Path $sampleDir){
+    # Check for leftover backup from previous -Path run
+    $existingBackup = Get-ChildItem -Path $root -Filter "sample_backup_*" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+    if($existingBackup){ $backupDir = $existingBackup.FullName }
+    elseif(Test-Path $sampleDir){
         $backupDir = Join-Path $root "sample_backup_$([guid]::NewGuid().ToString('N').Substring(0,8))"
         Rename-Item $sampleDir $backupDir
     }
@@ -290,11 +302,13 @@ if($Timestamp -or $Full){
     }
 }
 
-# Restore backup if we moved files
+# Restore backup if we moved files — keep user files in sample/ for verify
 if($backupDir -and (Test-Path $backupDir)){
-    $sampleDir = Join-Path $root 'sample'
-    Remove-Item -Recurse -Force $sampleDir -ErrorAction SilentlyContinue
-    Rename-Item $backupDir $sampleDir
+    # Don't restore yet — user needs sample/ intact for audit.ps1 -Verify
+    # Original sample files saved in backup dir, restored on next audit without -Path
+    Write-Host ""
+    Write-Host "  MERK: Originalfilene i sample/ er lagret i backup." -ForegroundColor Gray
+    Write-Host "  De gjenopprettes automatisk ved neste audit uten -Path." -ForegroundColor Gray
 }
 
 # Summary
